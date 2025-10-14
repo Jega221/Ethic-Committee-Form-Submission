@@ -19,5 +19,4 @@ Digital platform to submit and manage ethics approval requests (Faculty → Ethi
 6. `pip install -r requirements.txt` / `mvn` for backend
 
 ## Links
-- Jira board: <https://coms-444.atlassian.net/jira/software/projects/SCRUM/boards/1?jql=&atlOrigin=eyJpIjoiMDJmYjIwY2I5ZmJiNGU3NWI1MjgyYmQxZWFmOTVmNmYiLCJwIjoiaiJ9>
 - Drive docs: <https://drive.google.com/drive/folders/1pRI0IUHOkN42Q3zac3YEobkAwOsPF3Ku?usp=sharing>
