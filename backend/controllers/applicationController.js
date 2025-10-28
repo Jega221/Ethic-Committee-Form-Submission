@@ -8,6 +8,18 @@ async function submitApplication(req, res) {
   const { researcher_id, department_id, committee_id, title, description } = req.body;
   const files = req.files || []; // multer added files
 
+// Checklist Validation
+if (!researcher_id || !department_id || !committee_id || !title || !description) {
+  return res.status(400).json({ error: "All form fields are required." });
+}
+
+if (!req.files || req.files.length < 2) {
+  return res.status(400).json({
+    error: "At least 2 documents are required (e.g., research proposal and consent form)."
+  });
+}
+
+
   try {
     // 1) insert application
     const insertAppQuery = `
@@ -95,6 +107,14 @@ async function updateApplicationStatus(req, res) {
       return res.status(404).json({ error: "Application not found" });
     }
 
+    //Auto-archive when approved or rejected (ADD THIS)
+    if (["Approved", "Rejected"].includes(status)) {
+      await pool.query(
+        `UPDATE application SET is_archived = TRUE WHERE application_id = $1`,
+        [id]
+      );
+    }
+
     // 2. Insert a review comment
     const insertReview = `
       INSERT INTO application_reviews (application_id, committee_id, comment, status)
@@ -150,7 +170,20 @@ async function getApplicationReviews(req, res) {
   }
 }
 
-
+//Get all archived applications
+async function getArchivedApplications(req, res) {
+  try {
+    const result = await pool.query(`
+      SELECT * FROM application
+      WHERE is_archived = TRUE
+      ORDER BY submission_date DESC
+    `);
+    res.json(result.rows);
+  } catch (err) {
+    console.error("Error fetching archived apps:", err.message);
+    res.status(500).json({ error: "Failed to fetch archived apps" });
+  }
+}
 
 
 
@@ -159,5 +192,7 @@ module.exports = {
   getAllApplications, 
   updateApplicationStatus,
   getApplicationReviews,
+  getArchivedApplications
  };
 
+  

@@ -16,6 +16,15 @@ app.use("/api/researchers", researcherRoutes);
 const applicationRoutes = require("./routes/applications");
 app.use("/api/applications", applicationRoutes);
 
+// Import the checkPendingApplications function
+const checkPendingApplications = require('./cron/checkPendingApplications');
+// Run the check every 1 hour
+setInterval(() => {
+  console.log("⏱️ Running scheduled pending check...");
+  checkPendingApplications();
+}, 1000 * 300); // every 1 hour
+
+
 app.get('/', (req, res) => {
   res.send('Express server is running');
 });

@@ -6,7 +6,8 @@ const {
   submitApplication, 
   getAllApplications, 
   updateApplicationStatus,
-  getApplicationReviews
+  getApplicationReviews,
+  getArchivedApplications
  } = require('../controllers/applicationController');
 const pool = require('../db/index');
 
@@ -55,6 +56,9 @@ router.patch('/:id/status', updateApplicationStatus);
 
 // GET all reviews for one application
 router.get('/:id/reviews', getApplicationReviews);
+
+// GET archived applications
+router.get('/archived', getArchivedApplications);
 
 
 
