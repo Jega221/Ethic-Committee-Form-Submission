@@ -8,7 +8,7 @@ const router = express.Router();
 
 //  Signup route
 router.post('/signup', async (req, res) => {
-  const { name, surname, role_id=1, email, password } = req.body;
+  const { name, email, password } = req.body;
 
   try {
     // check if user exists
@@ -22,16 +22,16 @@ router.post('/signup', async (req, res) => {
 
     // insert new user
     const newUser = await pool.query(
-      'INSERT INTO users (name,surname, email, password,role_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name,surname, email, role_id',
-      [name, surname, email, hashedPassword, role_id]
+      'INSERT INTO users (name, email, password) VALUES ($1, $2, $3) RETURNING id, name, email',
+      [name, email, hashedPassword]
     );
 
     // generate JWT
-    const token = jwt.sign({ id: newUser.rows[0].id, email , role:newUser.rows[0].role}, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: newUser.rows[0].id, email }, process.env.JWT_SECRET, {
       expiresIn: '1h',
     });
 
-    res.json({ token, user: { id: newUser.rows[0].id, name: newUser.rows[0].name, email: newUser.rows[0].email, role: newUser.rows[0].role_id } });
+    res.status(201).json({ token, user: newUser.rows[0] });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -43,24 +43,23 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const userResult = await pool.query('SELECT * FROM Admins WHERE email = $1', [email]);
     if (userResult.rows.length === 0)
-      return res.status(400).json({ message: 'Email not found' });
+      return res.status(400).json({ message: 'User not found' });
 
     const user = userResult.rows[0];
 
     // compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
-      return res.status(400).json({ message: 'Invalid password' });
+      return res.status(400).json({ message: 'wrong password' });
 
     // generate token
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role_id }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user.id, email: user.email }, process.env.JWT_SECRET, {
       expiresIn: '1h',
     });
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role_id } });
-    console.log(`id: ${user.id} name :${user.name} has logged in`);
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

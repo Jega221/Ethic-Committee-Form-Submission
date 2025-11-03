@@ -10,7 +10,11 @@ const PORT = process.env.PORT || 3000;
 /*CREATE TABLE users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(100),
-  email VARCHAR(100) UNIQUE NOT NULL
+  email VARCHAR(100) UNIQUE NOT NULL,
+  password VARCHAR(25) NOT NULL,
+  role VARCHAR(50) DEFAULT 'user',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+
 );
 POST http://localhost:5000/api/auth/signup
 Body (JSON):
@@ -40,7 +44,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRouter);
 
 // Protected routes
-app.use('/api/users', authMiddleware, usersRouter);
+//app.use('/api/users', authMiddleware, usersRouter);
 
 // Start server
 app.listen(PORT, () => {
