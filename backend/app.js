@@ -22,7 +22,7 @@ const checkPendingApplications = require('./cron/checkPendingApplications');
 setInterval(() => {
   console.log("⏱️ Running scheduled pending check...");
   checkPendingApplications();
-}, 1000 * 300); // every 1 hour
+}, 1000 * 60 * 60); // every 1 hour
 
 
 app.get('/', (req, res) => {
