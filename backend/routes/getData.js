@@ -108,4 +108,17 @@ router.get('/reviews', verifyToken, async (req, res) => {
   }
 });
 
+router.get('/faculty', async (req, res) => {
+  try {
+    const query = `
+      SELECT * FROM faculties
+    `;
+    const faculties = (await pool.query(query)).rows;
+    res.json(faculties);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
