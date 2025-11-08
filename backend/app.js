@@ -3,6 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
+const getDataRouter = require('./routes/getData');
+
+
 //const authMiddleware = require('./middlewares/authMiddleware');
 
 
@@ -19,7 +22,8 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 
-// Protected routes
+// Protected routesapp.use('/api/admin', adminRoutes);
+app.use('/api/getData', getDataRouter);
 //app.use('/api/users', authMiddleware, usersRouter);
 
 // Start server
