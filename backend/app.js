@@ -4,6 +4,7 @@ const cors = require('cors');
 const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const getDataRouter = require('./routes/getData');
+const setRoleRouter= require('./routes/roles');
 
 
 //const authMiddleware = require('./middlewares/authMiddleware');
@@ -24,6 +25,7 @@ app.use('/api/admin', adminRouter);
 
 // Protected routesapp.use('/api/admin', adminRoutes);
 app.use('/api/getData', getDataRouter);
+app.use('/api/Role',setRoleRouter);
 //app.use('/api/users', authMiddleware, usersRouter);
 
 // Start server
