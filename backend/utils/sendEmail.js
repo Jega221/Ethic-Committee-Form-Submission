@@ -1,3 +1,4 @@
+// backend/utils/sendEmail.js
 const nodemailer = require("nodemailer");
 
 // Using Ethereal test account

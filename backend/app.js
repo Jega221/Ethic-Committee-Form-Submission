@@ -1,30 +1,37 @@
 // backend/app.js
 const express = require('express');
 const cors = require('cors');
+require('dotenv').config();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
 
-// allow uploaded files locally will be removed latter in production
+// Allow uploaded files locally (temporary for development)
 app.use('/uploads', express.static('uploads'));
 
+// Import routes
 const researcherRoutes = require("./routes/researcher");
-app.use("/api/researchers", researcherRoutes);
-
 const applicationRoutes = require("./routes/applications");
-app.use("/api/applications", applicationRoutes);
+const notificationRoutes = require('./routes/notifications');
+const authRouter = require('./routes/auth');
 
-// Import the checkPendingApplications function
+// Use routes
+app.use("/api/researchers", researcherRoutes);
+app.use("/api/applications", applicationRoutes);
+app.use("/api/notifications", notificationRoutes);
+app.use("/api/auth", authRouter);
+
+// Import and schedule the 48-hour pending check
 const checkPendingApplications = require('./cron/checkPendingApplications');
-// Run the check every 1 hour
 setInterval(() => {
   console.log("⏱️ Running scheduled pending check...");
   checkPendingApplications();
 }, 1000 * 60 * 60); // every 1 hour
 
-
+// Root route
 app.get('/', (req, res) => {
   res.send('Express server is running');
 });

@@ -1,48 +1,53 @@
-// backend/controllers/applicationController.js
 const pool = require('../db/index');
 const path = require('path');
 
-// Submit a new application with documents function
+/* 
+  APPLICATION CONTROLLER (Updated for unified users + faculties schema)
+  --------------------------------------------------------------------
+  - user_id instead of researcher_id
+  - faculty_id instead of department_id
+  - works with committee_id, role-based flow, and file uploads
+  - includes checklist validation + auto-archive
+*/
+
+// ✅ 1. Submit a new application (Researcher)
 async function submitApplication(req, res) {
-  // expected JSON fields in body
-  const { researcher_id, department_id, committee_id, title, description } = req.body;
-  const files = req.files || []; // multer added files
+  const { user_id, faculty_id, committee_id, title, description } = req.body;
+  const files = req.files || [];
 
-// Checklist Validation
-if (!researcher_id || !department_id || !committee_id || !title || !description) {
-  return res.status(400).json({ error: "All form fields are required." });
-}
+  // Checklist validation
+  if (!user_id || !faculty_id || !committee_id || !title || !description) {
+    return res.status(400).json({ error: "All form fields are required." });
+  }
 
-if (!req.files || req.files.length < 2) {
-  return res.status(400).json({
-    error: "At least 2 documents are required (e.g., research proposal and consent form)."
-  });
-}
-
+  if (!files.length || files.length < 2) {
+    return res.status(400).json({
+      error: "At least 2 documents are required (e.g., proposal and consent form)."
+    });
+  }
 
   try {
-    // 1) insert application
+    // 1️⃣ Insert application
     const insertAppQuery = `
-      INSERT INTO application (researcher_id, department_id, committee_id, title, description, status)
-      VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`;
+      INSERT INTO application (researcher_id, faculty_id, committee_id, title, description, status)
+      VALUES ($1, $2, $3, $4, $5, 'Pending') RETURNING *;
+    `;
     const appResult = await pool.query(insertAppQuery, [
-      researcher_id,
-      department_id,
+      user_id,
+      faculty_id,
       committee_id,
       title,
-      description,
-      'Pending' // use string status
+      description
     ]);
     const application = appResult.rows[0];
 
-    // 2) save document rows (file_url points to local path for now)
+    // 2️⃣ Insert uploaded documents
     const insertDocQuery = `
       INSERT INTO documents (application_id, file_name, file_type, file_url)
-      VALUES ($1,$2,$3,$4) RETURNING *`;
-
+      VALUES ($1, $2, $3, $4) RETURNING *;
+    `;
     const docRows = [];
     for (const f of files) {
-      // file path relative to server; backend dev will change to S3 URL later.
       const fileUrl = path.join('uploads', f.filename);
       const docRes = await pool.query(insertDocQuery, [
         application.application_id,
@@ -53,15 +58,14 @@ if (!req.files || req.files.length < 2) {
       docRows.push(docRes.rows[0]);
     }
 
-    // 3) return created application with docs
-    res.status(201).json({ application, documents: docRows });
+    res.status(201).json({ message: "Application submitted successfully", application, documents: docRows });
   } catch (err) {
-    console.error('Error submitting application:', err);
-    res.status(500).json({ error: 'Application submission failed' });
+    console.error("Error submitting application:", err);
+    res.status(500).json({ error: "Application submission failed" });
   }
 }
 
-// get all applications function, so the admin, faculty, or committee can view every submitted form
+// ✅ 2. Get all applications (Admin, Committee, Faculty)
 async function getAllApplications(req, res) {
   try {
     const result = await pool.query(`
@@ -71,12 +75,12 @@ async function getAllApplications(req, res) {
         a.description,
         a.status,
         a.submission_date,
-        r.first_name AS researcher_first_name,
-        r.last_name AS researcher_last_name,
-        d.email AS department_email
+        u.name AS researcher_name,
+        u.surname AS researcher_surname,
+        f.name AS faculty_name
       FROM application a
-      JOIN researcher r ON a.researcher_id = r.researcher_id
-      JOIN department d ON a.department_id = d.department_id
+      JOIN users u ON a.researcher_id = u.id
+      JOIN faculties f ON a.faculty_id = f.id
       ORDER BY a.submission_date DESC;
     `);
 
@@ -87,13 +91,12 @@ async function getAllApplications(req, res) {
   }
 }
 
-// PATCH - update application status + add review comment
+// ✅ 3. Update application status + add committee review
 async function updateApplicationStatus(req, res) {
   const { id } = req.params;
   const { status, comment, committee_id } = req.body;
 
   try {
-    // 1. Update the main application status
     const updateQuery = `
       UPDATE application
       SET status = $1
@@ -102,31 +105,23 @@ async function updateApplicationStatus(req, res) {
     `;
     const appResult = await pool.query(updateQuery, [status, id]);
     const updatedApp = appResult.rows[0];
-
+    
     if (!updatedApp) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    //Auto-archive when approved or rejected (ADD THIS)
+    // Auto-archive approved or rejected
     if (["Approved", "Rejected"].includes(status)) {
-      await pool.query(
-        `UPDATE application SET is_archived = TRUE WHERE application_id = $1`,
-        [id]
-      );
+      await pool.query(`UPDATE application SET is_archived = TRUE WHERE application_id = $1`, [id]);
     }
 
-    // 2. Insert a review comment
+    // Insert a review note
     const insertReview = `
       INSERT INTO application_reviews (application_id, committee_id, comment, status)
       VALUES ($1, $2, $3, $4)
       RETURNING *;
     `;
-    const reviewResult = await pool.query(insertReview, [
-      id,
-      committee_id || null,
-      comment || '',
-      status,
-    ]);
+    const reviewResult = await pool.query(insertReview, [id, committee_id || null, comment || '', status]);
 
     res.status(200).json({
       message: `Application status updated to ${status}`,
@@ -139,10 +134,9 @@ async function updateApplicationStatus(req, res) {
   }
 }
 
-//Get all reviews for a specific application
+// ✅ 4. Get all reviews for a specific application
 async function getApplicationReviews(req, res) {
-  const { id } = req.params; // application_id
-
+  const { id } = req.params;
   try {
     const query = `
       SELECT 
@@ -150,19 +144,18 @@ async function getApplicationReviews(req, res) {
         ar.comment,
         ar.status,
         ar.review_date,
-        c.f_name AS committee_first_name,
-        c.l_name AS committee_last_name
+        c.committee_id,
+        u.name AS committee_name
       FROM application_reviews ar
       JOIN committee c ON ar.committee_id = c.committee_id
+      JOIN users u ON c.user_id = u.id
       WHERE ar.application_id = $1
       ORDER BY ar.review_date DESC;
     `;
     const result = await pool.query(query, [id]);
-
-    if (result.rows.length === 0) {
+    if (!result.rows.length) {
       return res.status(404).json({ message: "No reviews found for this application" });
     }
-
     res.json(result.rows);
   } catch (err) {
     console.error("Error fetching reviews:", err.message);
@@ -170,13 +163,13 @@ async function getApplicationReviews(req, res) {
   }
 }
 
-//Get all archived applications
+// ✅ 5. Get archived (approved/rejected) applications
 async function getArchivedApplications(req, res) {
   try {
     const result = await pool.query(`
       SELECT * FROM application
       WHERE is_archived = TRUE
-      ORDER BY submission_date DESC
+      ORDER BY submission_date DESC;
     `);
     res.json(result.rows);
   } catch (err) {
@@ -185,80 +178,10 @@ async function getArchivedApplications(req, res) {
   }
 }
 
-// Modify an existing application (only if status = 'Revision Requested')
-async function modifyApplication(req, res) {
-  const { id } = req.params; // application_id
-  const { title, description } = req.body;
-  const files = req.files || [];
-
-  try {
-    // 1. Check if the application exists and can be modified
-    const checkApp = await pool.query(
-      `SELECT * FROM application WHERE application_id = $1`,
-      [id]
-    );
-
-    if (checkApp.rows.length === 0) {
-      return res.status(404).json({ error: "Application not found" });
-    }
-
-    const app = checkApp.rows[0];
-    if (app.status !== "Revision Requested") {
-      return res.status(400).json({
-        error: "Only applications with 'Revision Requested' status can be modified.",
-      });
-    }
-
-    // 2. Update title and description
-    const updateQuery = `
-      UPDATE application
-      SET title = COALESCE($1, title),
-          description = COALESCE($2, description),
-          status = 'Pending'
-      WHERE application_id = $3
-      RETURNING *;
-    `;
-    const updatedApp = await pool.query(updateQuery, [title, description, id]);
-
-    // 3. If new documents uploaded, replace existing ones
-    if (files.length > 0) {
-      await pool.query(`DELETE FROM documents WHERE application_id = $1`, [id]);
-
-      const insertDocQuery = `
-        INSERT INTO documents (application_id, file_name, file_type, file_url)
-        VALUES ($1, $2, $3, $4) RETURNING *;
-      `;
-
-      for (const f of files) {
-        const fileUrl = path.join('uploads', f.filename);
-        await pool.query(insertDocQuery, [
-          id,
-          f.originalname,
-          f.mimetype,
-          fileUrl
-        ]);
-      }
-    }
-
-    res.status(200).json({
-      message: "Application modified successfully and set to Pending.",
-      application: updatedApp.rows[0],
-    });
-  } catch (err) {
-    console.error("Error modifying application:", err);
-    res.status(500).json({ error: "Failed to modify application" });
-  }
-}
-
-
-
-module.exports = { 
-  submitApplication, 
-  getAllApplications, 
+module.exports = {
+  submitApplication,
+  getAllApplications,
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
-  modifyApplication
- };
-
-  
+};

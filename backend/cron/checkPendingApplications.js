@@ -1,6 +1,8 @@
+// backend/cron/checkPendingApplications.js
 require('dotenv').config();
 const pool = require('../db/index');
 const { sendEmail } = require('../utils/sendEmail');
+const { createNotification } = require('../utils/notifications'); // if you have this
 const cron = require('node-cron');
 
 async function checkPendingApplications() {
@@ -8,9 +10,14 @@ async function checkPendingApplications() {
 
   try {
     const result = await pool.query(`
-      SELECT a.application_id, a.title, a.submission_date, r.email AS researcher_email
+      SELECT 
+      a.application_id, 
+      a.title, 
+      a.submission_date, 
+      u.email AS researcher_email, 
+      u.id AS researcher_id
       FROM application a
-      JOIN researcher r ON a.researcher_id = r.researcher_id
+      JOIN users u ON a.researcher_id = u.id
       WHERE a.status = 'Pending'
         AND a.submission_date < NOW() - INTERVAL '48 hours'
     `);
@@ -30,10 +37,24 @@ async function checkPendingApplications() {
         Please wait for admin review or contact the committee.
       `;
 
+      // Send email
       try {
         await sendEmail(app.researcher_email, subject, message);
       } catch (err) {
         console.error(`❌ Error sending email for App #${app.application_id}:`, err.message);
+      }
+
+      // Optional: create notification record in DB (if notifications table exists)
+      if (typeof createNotification === 'function') {
+        try {
+          await createNotification(
+            app.researcher_id,
+            app.application_id,
+            "Your application has been pending for over 48 hours. Please contact the committee if needed."
+          );
+        } catch (notifyErr) {
+          console.error(`⚠️ Failed to create notification for App #${app.application_id}:`, notifyErr.message);
+        }
       }
     }
   } catch (err) {
@@ -43,13 +64,9 @@ async function checkPendingApplications() {
   console.log('✅ 48-hour pending check complete.\n');
 }
 
-// ✅ Schedule: runs every minute (for testing)
+// Run every minute for testing
 cron.schedule('* * * * *', async () => {
   await checkPendingApplications();
 });
-
-// Change this later to once a day:
-// cron.schedule('0 0 * * *', async () => { await checkPendingApplications(); });
-// That runs at midnight every day
 
 console.log('🚀 Cron job started. Checking pending applications every minute...');
