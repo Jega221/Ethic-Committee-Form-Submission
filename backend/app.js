@@ -21,6 +21,7 @@ const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const getDataRouter = require('./routes/getData');
 const setRoleRouter = require('./routes/roles');
+const messagingRoutes = require('./routes/messaging');
 // const authMiddleware = require('./middlewares/authMiddleware'); // optional future use
 
 // === ROUTES SETUP ===
@@ -31,6 +32,8 @@ app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/getData', getDataRouter);
 app.use('/api/role', setRoleRouter);
+app.use('/api/messaging', messagingRoutes);
+
 
 // === CRON JOB (48-hour pending check) ===
 const checkPendingApplications = require('./cron/checkPendingApplications');
@@ -43,6 +46,7 @@ setInterval(() => {
 app.get('/', (req, res) => {
   res.send('Express server is running');
 });
+
 
 // === START SERVER ===
 app.listen(PORT, () => {
