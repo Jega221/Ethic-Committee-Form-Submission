@@ -5,6 +5,8 @@ const authRouter = require('./routes/auth');
 const adminRouter = require('./routes/admin');
 const getDataRouter = require('./routes/getData');
 const setRoleRouter= require('./routes/roles');
+const facultyRouter= require('./routes/faculty');
+const workflowRouter= require('./routes/workflow');
 
 
 //const authMiddleware = require('./middlewares/authMiddleware');
@@ -26,7 +28,9 @@ app.use('/api/admin', adminRouter);
 // Protected routesapp.use('/api/admin', adminRoutes);
 app.use('/api/getData', getDataRouter);
 app.use('/api/Role',setRoleRouter);
+app.use('/api/faculty',facultyRouter);
 //app.use('/api/users', authMiddleware, usersRouter);
+app.use('/api/workflow',workflowRouter);
 
 // Start server
 app.listen(PORT, () => {
