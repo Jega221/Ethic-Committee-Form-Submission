@@ -59,7 +59,8 @@ router.patch('/:id/status', updateApplicationStatus);
 router.get('/:id/reviews', getApplicationReviews);
 
 // Modify application (only if status = 'Revision Requested')
-//router.put('/:id', upload.array('documents', 5), modifyApplication);
+router.put('/:id', upload.array('documents', 5), modifyApplication);
+
 
 // GET archived applications
 router.get('/archived', getArchivedApplications);

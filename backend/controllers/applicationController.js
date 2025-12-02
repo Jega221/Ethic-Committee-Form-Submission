@@ -178,10 +178,79 @@ async function getArchivedApplications(req, res) {
   }
 }
 
+// ✅ 6. Modify an existing application (only if status = 'Revision Requested')
+async function modifyApplication(req, res) {
+  const { id } = req.params;
+  const { title, description } = req.body;
+  const files = req.files || [];
+
+  try {
+    // 1️⃣ Fetch application first
+    const appQuery = `SELECT * FROM application WHERE application_id = $1`;
+    const result = await pool.query(appQuery, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = result.rows[0];
+
+    // Only allowed when status = Revision Requested
+    if (app.status !== "Revision Requested") {
+      return res.status(403).json({ 
+        error: "Application cannot be modified unless it is in 'Revision Requested' status."
+      });
+    }
+
+    // 2️⃣ Update title + description
+    const updateQuery = `
+      UPDATE application
+      SET title = $1, description = $2, status = 'Pending'
+      WHERE application_id = $3
+      RETURNING *;
+    `;
+
+    const updated = await pool.query(updateQuery, [title, description, id]);
+
+    // 3️⃣ If new documents uploaded → replace old ones
+    if (files.length > 0) {
+      // Delete old docs
+      await pool.query(`DELETE FROM documents WHERE application_id = $1`, [id]);
+
+      // Insert new ones
+      const insertDocQuery = `
+        INSERT INTO documents (application_id, file_name, file_type, file_url)
+        VALUES ($1, $2, $3, $4)
+      `;
+
+      for (const f of files) {
+        const fileUrl = path.join("uploads", f.filename);
+        await pool.query(insertDocQuery, [
+          id,
+          f.originalname,
+          f.mimetype,
+          fileUrl
+        ]);
+      }
+    }
+
+    return res.status(200).json({
+      message: "Application updated successfully.",
+      application: updated.rows[0]
+    });
+
+  } catch (err) {
+    console.error("Error modifying application:", err);
+    res.status(500).json({ error: "Failed to modify application" });
+  }
+}
+
+
 module.exports = {
   submitApplication,
   getAllApplications,
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
+  modifyApplication 
 };

@@ -31,7 +31,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/auth', authRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/getData', getDataRouter);
-app.use('/api/role', setRoleRouter);
+app.use('/api/Role', setRoleRouter);
 app.use('/api/messaging', messagingRoutes);
 
 

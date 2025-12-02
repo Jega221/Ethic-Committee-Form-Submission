@@ -1,4 +1,4 @@
-// backend/db/index.js
+/*backend/db/index.js
 require("dotenv").config();
 
 const { Pool } = require("pg");
@@ -12,6 +12,17 @@ const pool = new Pool({
   port: process.env.DB_PORT,
 });
 
-module.exports = pool;
+module.exports = pool;*/
+//backend/db/index.js
+require("dotenv").config();
+const { Pool } = require("pg");
 
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
+});
+
+module.exports = pool;
 
