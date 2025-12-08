@@ -11,12 +11,12 @@ const processSteps = [
 
 export const ReviewProcess: React.FC = () => {
   return (
-    <section className="self-stretch min-h-[232px] w-full mt-16 max-md:max-w-full max-md:mt-10">
-      <div className="flex w-full flex-col items-center text-[rgba(30,41,57,1)] text-base font-normal text-center justify-center px-[70px] py-px max-md:max-w-full max-md:px-5">
-        <h2 className="z-10">Review Process</h2>
+    <section className="w-full mt-16 max-md:mt-10">
+      <div className="text-center mb-8">
+        <h2 className="text-foreground text-lg font-medium">Review Process</h2>
       </div>
       <div 
-        className="flex w-full items-stretch gap-5 whitespace-nowrap flex-wrap justify-between mt-12 px-12 py-px max-md:max-w-full max-md:mt-10 max-md:px-5"
+        className="flex items-start justify-center flex-wrap gap-y-6 px-4"
         role="list"
         aria-label="Ethics review process steps"
       >
@@ -26,6 +26,7 @@ export const ReviewProcess: React.FC = () => {
             stepNumber={step.stepNumber}
             title={step.title}
             subtitle={step.subtitle}
+            showConnector={index < processSteps.length - 1}
           />
         ))}
       </div>

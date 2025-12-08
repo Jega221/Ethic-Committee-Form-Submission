@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Bell, HelpCircle, User, Camera } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
@@ -9,18 +9,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 const Settings = () => {
-  // This will be replaced with actual user data from authentication
   const [profile, setProfile] = useState({
     firstName: '',
     surname: '',
     email: '',
-    studentId: '',
-    dateOfBirth: '',
-    department: '',
+    faculty: '',
   });
 
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+
+  // Load user profile from localStorage on mount
+  useEffect(() => {
+    const savedProfile = localStorage.getItem('userProfile');
+    if (savedProfile) {
+      const parsed = JSON.parse(savedProfile);
+      setProfile({
+        firstName: parsed.firstName || '',
+        surname: parsed.surname || '',
+        email: parsed.email || '',
+        faculty: parsed.faculty || '',
+      });
+    }
+  }, []);
 
   return (
     <SidebarProvider>
@@ -112,33 +123,13 @@ const Settings = () => {
                       </p>
                     </div>
 
-                    {/* Student ID */}
+                    {/* Faculty */}
                     <div>
                       <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Student ID
+                        Faculty
                       </p>
-                      <p className="text-base text-foreground">
-                        {profile.studentId || 'Not set'}
-                      </p>
-                    </div>
-
-                    {/* Date of Birth */}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Date of Birth
-                      </p>
-                      <p className="text-base text-foreground">
-                        {profile.dateOfBirth || 'Not set'}
-                      </p>
-                    </div>
-
-                    {/* Department */}
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-1">
-                        Department
-                      </p>
-                      <p className="text-base text-foreground">
-                        {profile.department || 'Not set'}
+                      <p className="text-base text-foreground capitalize">
+                        {profile.faculty || 'Not set'}
                       </p>
                     </div>
                   </div>
@@ -167,16 +158,8 @@ const Settings = () => {
                             <Input id="email" type="email" defaultValue={profile.email} />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="studentId">Student ID</Label>
-                            <Input id="studentId" defaultValue={profile.studentId} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="dob">Date of Birth</Label>
-                            <Input id="dob" defaultValue={profile.dateOfBirth} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="department">Department</Label>
-                            <Input id="department" defaultValue={profile.department} />
+                            <Label htmlFor="faculty">Faculty</Label>
+                            <Input id="faculty" defaultValue={profile.faculty} />
                           </div>
                         </div>
                         <Button className="w-full mt-4">Save Changes</Button>

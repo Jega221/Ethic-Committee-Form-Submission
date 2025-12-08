@@ -20,11 +20,20 @@ const Signup = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    // Simulate signup process
+    // Save user profile to localStorage
+    const userProfile = {
+      firstName,
+      surname,
+      email,
+      faculty,
+    };
+    localStorage.setItem('userProfile', JSON.stringify(userProfile));
+    
+    // Clear any previous submitted applications for new user
+    localStorage.removeItem('submittedApplications');
+    
     setTimeout(() => {
       setIsLoading(false);
-      console.log('Signup attempt:', { firstName, surname, faculty, email });
-      // Redirect to dashboard after successful signup
       navigate('/dashboard');
     }, 1000);
   };

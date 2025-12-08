@@ -48,7 +48,7 @@ const Dashboard = () => {
               
               <button 
                 onClick={handleStartApplication}
-                className="bg-primary text-primary-foreground text-base font-medium px-6 py-3 rounded-lg hover:bg-primary/90 transition-colors"
+                className="bg-destructive text-destructive-foreground text-base font-medium px-6 py-3 rounded-lg hover:bg-destructive/90 transition-colors"
               >
                 Start New Application
               </button>
@@ -56,7 +56,7 @@ const Dashboard = () => {
           </main>
 
           {/* Help Button */}
-          <button className="fixed bottom-8 right-8 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors">
+          <button className="fixed bottom-8 right-8 bg-destructive text-destructive-foreground p-4 rounded-full shadow-lg hover:bg-destructive/90 transition-colors">
             <HelpCircle className="w-6 h-6" />
           </button>
         </div>

@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { apiRequest } from '@/lib/api';
 import fiuLogo from '@/assets/fiu-login-logo.png';
 
 const Login = () => {
@@ -15,14 +16,33 @@ const Login = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    
-    // Simulate login process
-    setTimeout(() => {
+
+    try {
+      const body = {
+        email: email,
+        password: password,
+      };
+
+      const data = await apiRequest<{ token: string; user: any }>(
+        "/auth/login",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        }
+      );
+
+      console.log("Login success:", data);
+
+      localStorage.setItem("token", data.token);
+
+      alert("Login successful");
+      navigate("/dashboard");
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Login failed");
+    } finally {
       setIsLoading(false);
-      console.log('Login attempt:', { email });
-      // Redirect to dashboard after successful login
-      navigate('/dashboard');
-    }, 1000);
+    }
   };
 
   return (

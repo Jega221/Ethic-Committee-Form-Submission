@@ -9,6 +9,7 @@ import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
 import NewApplication from "./pages/NewApplication";
 import UploadedFiles from "./pages/UploadedFiles";
+import StudyStatus from "./pages/StudyStatus";
 import Agenda from "./pages/Agenda";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/new-application" element={<NewApplication />} />
           <Route path="/uploaded-files" element={<UploadedFiles />} />
+          <Route path="/study-status" element={<StudyStatus />} />
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/settings" element={<Settings />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

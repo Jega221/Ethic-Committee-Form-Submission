@@ -11,7 +11,7 @@ export const LoginButton: React.FC = () => {
   return (
     <button
       onClick={handleLogin}
-      className="bg-[rgba(231,0,11,1)] flex w-[92px] items-stretch gap-2 text-sm text-white whitespace-nowrap leading-none mt-[34px] px-4 py-3.5 rounded-lg hover:bg-[rgba(207,0,10,1)] transition-colors"
+      className="bg-[hsl(var(--destructive))] flex w-[140px] items-center justify-center gap-3 text-base font-medium text-white whitespace-nowrap leading-none mt-[34px] px-6 py-4 rounded-lg hover:bg-[hsl(var(--destructive))]/90 transition-colors"
       aria-label="Login to Ethics Committee Portal"
     >
       <img

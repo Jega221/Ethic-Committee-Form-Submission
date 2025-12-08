@@ -57,11 +57,29 @@ const NewApplicationContent = () => {
   const { setOpen } = useSidebar();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('applicant');
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [isDragging, setIsDragging] = useState(false);
+const [documentFiles, setDocumentFiles] = useState<{
+    informedConsent: File | null;
+    researchProtocol: File | null;
+    dataCollection: File | null;
+    institutionalApprovals: File | null;
+    otherDocuments: File | null;
+  }>({
+    informedConsent: null,
+    researchProtocol: null,
+    dataCollection: null,
+    institutionalApprovals: null,
+    otherDocuments: null,
+  });
+  const [draggingField, setDraggingField] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState('');
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+const fileInputRefs = {
+    informedConsent: React.useRef<HTMLInputElement>(null),
+    researchProtocol: React.useRef<HTMLInputElement>(null),
+    dataCollection: React.useRef<HTMLInputElement>(null),
+    institutionalApprovals: React.useRef<HTMLInputElement>(null),
+    otherDocuments: React.useRef<HTMLInputElement>(null),
+  };
 
   // Form data states
   const [applicantData, setApplicantData] = useState({
@@ -107,38 +125,36 @@ const NewApplicationContent = () => {
     setOpen(false);
   }, [setOpen]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setUploadedFiles(prev => [...prev, ...newFiles]);
+  const handleFileChange = (field: keyof typeof documentFiles) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setDocumentFiles(prev => ({ ...prev, [field]: e.target.files![0] }));
     }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (field: string) => (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(true);
+    setDraggingField(field);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    setDraggingField(null);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (field: keyof typeof documentFiles) => (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
-    if (e.dataTransfer.files) {
-      const newFiles = Array.from(e.dataTransfer.files);
-      setUploadedFiles(prev => [...prev, ...newFiles]);
+    setDraggingField(null);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      setDocumentFiles(prev => ({ ...prev, [field]: e.dataTransfer.files[0] }));
     }
   };
 
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
+  const handleUploadClick = (field: keyof typeof fileInputRefs) => () => {
+    fileInputRefs[field].current?.click();
   };
 
-  const removeFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+  const removeFile = (field: keyof typeof documentFiles) => () => {
+    setDocumentFiles(prev => ({ ...prev, [field]: null }));
   };
 
   const validateAndProceed = (currentTab: string, nextTab: string, schema: z.ZodSchema, data: any) => {
@@ -176,10 +192,18 @@ const NewApplicationContent = () => {
   };
 
   const handleDocumentsNext = () => {
-    if (uploadedFiles.length === 0) {
+    const requiredDocs = ['informedConsent', 'researchProtocol', 'dataCollection'] as const;
+    const missingDocs = requiredDocs.filter(doc => !documentFiles[doc]);
+    
+    if (missingDocs.length > 0) {
+      const docNames: Record<string, string> = {
+        informedConsent: 'Informed Consent Form',
+        researchProtocol: 'Research Protocol or Proposal',
+        dataCollection: 'Data Collection Instruments',
+      };
       toast({
         title: "Validation Error",
-        description: "Please upload at least one document",
+        description: `Please upload: ${missingDocs.map(d => docNames[d]).join(', ')}`,
         variant: "destructive",
       });
       return;
@@ -197,6 +221,45 @@ const NewApplicationContent = () => {
       submitSchema.parse(submitData);
       const refNum = `EC-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1000).padStart(4, '0')}`;
       setReferenceNumber(refNum);
+      
+      // Save submission to localStorage
+      const submissionData = {
+        id: refNum,
+        title: researchData.projectTitle,
+        submittedDate: new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        status: 'Under Faculty Review',
+        documents: [
+          documentFiles.informedConsent && { 
+            type: 'Informed Consent Form', 
+            fileName: documentFiles.informedConsent.name 
+          },
+          documentFiles.researchProtocol && { 
+            type: 'Research Protocol', 
+            fileName: documentFiles.researchProtocol.name 
+          },
+          documentFiles.dataCollection && { 
+            type: 'Data Collection Instruments', 
+            fileName: documentFiles.dataCollection.name 
+          },
+          documentFiles.institutionalApprovals && { 
+            type: 'Institutional Approval', 
+            fileName: documentFiles.institutionalApprovals.name 
+          },
+          documentFiles.otherDocuments && { 
+            type: 'Other Documentation', 
+            fileName: documentFiles.otherDocuments.name 
+          },
+        ].filter(Boolean),
+      };
+      
+      const existingSubmissions = JSON.parse(localStorage.getItem('submittedApplications') || '[]');
+      existingSubmissions.push(submissionData);
+      localStorage.setItem('submittedApplications', JSON.stringify(existingSubmissions));
+      
       setIsSubmitted(true);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -216,7 +279,13 @@ const NewApplicationContent = () => {
   const handleSubmitAnother = () => {
     setIsSubmitted(false);
     setActiveTab('applicant');
-    setUploadedFiles([]);
+    setDocumentFiles({
+      informedConsent: null,
+      researchProtocol: null,
+      dataCollection: null,
+      institutionalApprovals: null,
+      otherDocuments: null,
+    });
     setReferenceNumber('');
     setApplicantData({ firstName: '', lastName: '', email: '', phone: '', department: '', position: '' });
     setResearchData({ projectTitle: '', projectDescription: '', researchType: '', startDate: '', endDate: '', fundingSource: '' });
@@ -430,7 +499,7 @@ const NewApplicationContent = () => {
                 <div className="flex justify-end pt-4">
                   <Button 
                     type="submit"
-                    className="bg-foreground text-background hover:bg-foreground/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Next: Research Details
                   </Button>
@@ -537,7 +606,7 @@ const NewApplicationContent = () => {
                   </Button>
                   <Button 
                     type="submit"
-                    className="bg-foreground text-background hover:bg-foreground/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Next: Participants
                   </Button>
@@ -622,7 +691,7 @@ const NewApplicationContent = () => {
                   </Button>
                   <Button 
                     type="submit"
-                    className="bg-foreground text-background hover:bg-foreground/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Next: Ethics
                   </Button>
@@ -711,7 +780,7 @@ const NewApplicationContent = () => {
                   </Button>
                   <Button 
                     type="submit"
-                    className="bg-foreground text-background hover:bg-foreground/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Next: Documents
                   </Button>
@@ -725,98 +794,212 @@ const NewApplicationContent = () => {
               <h2 className="text-2xl font-semibold text-foreground mb-2">
                 Supporting Documents
               </h2>
-              <p className="text-muted-foreground mb-8">
-                Upload all relevant documents related to your research study
+              <p className="text-muted-foreground mb-6">
+                Upload all required documents related to your research study. All fields marked with * are mandatory.
               </p>
 
-              <div className="space-y-6">
-                <div className="bg-secondary/30 rounded-lg p-6 border border-border">
-                  <h3 className="text-lg font-semibold text-foreground mb-4">
-                    Required Documents
-                  </h3>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span className="text-primary">Informed consent form</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span className="text-primary">Research protocol or proposal</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span className="text-primary">Data collection instruments (surveys, questionnaires, etc.)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span className="text-primary">Institutional approvals (if applicable)</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="text-primary">•</span>
-                      <span className="text-primary">Any other relevant documentation</span>
-                    </li>
-                  </ul>
+              <div className="bg-primary/5 rounded-lg p-4 border border-primary/20 mb-8">
+                <h3 className="text-primary font-semibold mb-2">Document Requirements</h3>
+                <p className="text-sm text-primary">
+                  Please upload each required document in the designated field below. Accepted formats: PDF, DOC, DOCX (Maximum 10MB per file)
+                </p>
+              </div>
+
+              <div className="space-y-8">
+                {/* 1. Informed Consent Form */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">1. Informed Consent Form <span className="text-destructive">*</span></h3>
+                  <p className="text-sm text-muted-foreground">Upload the consent form that participants will sign</p>
+                  <input
+                    ref={fileInputRefs.informedConsent}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange('informedConsent')}
+                  />
+                  {documentFiles.informedConsent ? (
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate">{documentFiles.informedConsent.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          ({(documentFiles.informedConsent.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={removeFile('informedConsent')} className="h-8 w-8 p-0">×</Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        draggingField === 'informedConsent' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={handleUploadClick('informedConsent')}
+                      onDragOver={handleDragOver('informedConsent')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop('informedConsent')}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm mb-1"><span className="text-primary font-medium">Click to upload</span> <span className="text-muted-foreground">or drag and drop</span></p>
+                      <p className="text-xs text-muted-foreground">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+                  )}
                 </div>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  multiple
-                  accept=".pdf,.doc,.docx"
-                  onChange={handleFileChange}
-                />
-
-                <div 
-                  className={`border-2 border-dashed rounded-lg p-8 sm:p-12 text-center transition-colors cursor-pointer ${
-                    isDragging 
-                      ? 'border-primary bg-primary/5' 
-                      : 'border-border hover:border-primary/50'
-                  }`}
-                  onClick={handleUploadClick}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                >
-                  <Upload className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-muted-foreground" />
-                  <p className="text-sm sm:text-base mb-2 flex flex-wrap items-center justify-center gap-1">
-                    <span className="text-primary font-medium">Click to upload</span>
-                    <span className="text-muted-foreground">or drag and drop</span>
-                  </p>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    PDF, DOC, DOCX files up to 10MB
-                  </p>
+                {/* 2. Research Protocol or Proposal */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">2. Research Protocol or Proposal <span className="text-destructive">*</span></h3>
+                  <p className="text-sm text-muted-foreground">Upload your detailed research protocol or proposal document</p>
+                  <input
+                    ref={fileInputRefs.researchProtocol}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange('researchProtocol')}
+                  />
+                  {documentFiles.researchProtocol ? (
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate">{documentFiles.researchProtocol.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          ({(documentFiles.researchProtocol.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={removeFile('researchProtocol')} className="h-8 w-8 p-0">×</Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        draggingField === 'researchProtocol' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={handleUploadClick('researchProtocol')}
+                      onDragOver={handleDragOver('researchProtocol')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop('researchProtocol')}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm mb-1"><span className="text-primary font-medium">Click to upload</span> <span className="text-muted-foreground">or drag and drop</span></p>
+                      <p className="text-xs text-muted-foreground">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+                  )}
                 </div>
 
-                {uploadedFiles.length > 0 && (
-                  <div className="bg-secondary/30 rounded-lg p-4 border border-border">
-                    <h3 className="text-sm font-semibold text-foreground mb-3">
-                      Uploaded Files ({uploadedFiles.length})
-                    </h3>
-                    <ul className="space-y-2">
-                      {uploadedFiles.map((file, index) => (
-                        <li key={index} className="flex items-center justify-between p-2 bg-card rounded border border-border">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <FileText className="w-4 h-4 text-primary flex-shrink-0" />
-                            <span className="text-sm text-foreground truncate">{file.name}</span>
-                            <span className="text-xs text-muted-foreground flex-shrink-0">
-                              ({(file.size / 1024).toFixed(1)} KB)
-                            </span>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeFile(index)}
-                            className="flex-shrink-0 h-8 w-8 p-0"
-                          >
-                            ×
-                          </Button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                {/* 3. Data Collection Instruments */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">3. Data Collection Instruments (Surveys, Questionnaires, etc.) <span className="text-destructive">*</span></h3>
+                  <p className="text-sm text-muted-foreground">Upload your surveys, questionnaires, or other data collection tools</p>
+                  <input
+                    ref={fileInputRefs.dataCollection}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange('dataCollection')}
+                  />
+                  {documentFiles.dataCollection ? (
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate">{documentFiles.dataCollection.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          ({(documentFiles.dataCollection.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={removeFile('dataCollection')} className="h-8 w-8 p-0">×</Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        draggingField === 'dataCollection' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={handleUploadClick('dataCollection')}
+                      onDragOver={handleDragOver('dataCollection')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop('dataCollection')}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm mb-1"><span className="text-primary font-medium">Click to upload</span> <span className="text-muted-foreground">or drag and drop</span></p>
+                      <p className="text-xs text-muted-foreground">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Institutional Approvals */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">4. Institutional Approvals (If Applicable)</h3>
+                  <p className="text-sm text-muted-foreground">Upload any institutional approval documents if required for your research</p>
+                  <input
+                    ref={fileInputRefs.institutionalApprovals}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange('institutionalApprovals')}
+                  />
+                  {documentFiles.institutionalApprovals ? (
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate">{documentFiles.institutionalApprovals.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          ({(documentFiles.institutionalApprovals.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={removeFile('institutionalApprovals')} className="h-8 w-8 p-0">×</Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        draggingField === 'institutionalApprovals' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={handleUploadClick('institutionalApprovals')}
+                      onDragOver={handleDragOver('institutionalApprovals')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop('institutionalApprovals')}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm mb-1"><span className="text-primary font-medium">Click to upload</span> <span className="text-muted-foreground">or drag and drop</span></p>
+                      <p className="text-xs text-muted-foreground">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* 5. Any Other Relevant Documentation */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-foreground">5. Any Other Relevant Documentation</h3>
+                  <p className="text-sm text-muted-foreground">Upload any additional documents that support your application</p>
+                  <input
+                    ref={fileInputRefs.otherDocuments}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.doc,.docx"
+                    onChange={handleFileChange('otherDocuments')}
+                  />
+                  {documentFiles.otherDocuments ? (
+                    <div className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg border border-border">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="w-4 h-4 text-primary flex-shrink-0" />
+                        <span className="text-sm text-foreground truncate">{documentFiles.otherDocuments.name}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          ({(documentFiles.otherDocuments.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={removeFile('otherDocuments')} className="h-8 w-8 p-0">×</Button>
+                    </div>
+                  ) : (
+                    <div 
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
+                        draggingField === 'otherDocuments' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                      }`}
+                      onClick={handleUploadClick('otherDocuments')}
+                      onDragOver={handleDragOver('otherDocuments')}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop('otherDocuments')}
+                    >
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm mb-1"><span className="text-primary font-medium">Click to upload</span> <span className="text-muted-foreground">or drag and drop</span></p>
+                      <p className="text-xs text-muted-foreground">PDF, DOC, DOCX up to 10MB</p>
+                    </div>
+                  )}
+                </div>
 
                 <Alert className="border-amber-500/50 bg-amber-500/10">
                   <AlertDescription className="text-sm">
@@ -839,7 +1022,7 @@ const NewApplicationContent = () => {
                   <Button 
                     type="button" 
                     onClick={handleDocumentsNext}
-                    className="bg-foreground text-background hover:bg-foreground/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
                     Next: Review & Submit
                   </Button>
