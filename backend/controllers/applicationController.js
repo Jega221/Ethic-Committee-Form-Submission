@@ -20,9 +20,9 @@ async function submitApplication(req, res) {
     return res.status(400).json({ error: "All form fields are required." });
   }
 
-  if (!files.length || files.length < 2) {
+  if (!files.length || files.length < 5) {
     return res.status(400).json({
-      error: "At least 2 documents are required (e.g., proposal and consent form)."
+      error: "At least 5 documents are required (e.g., proposal and consent form)."
     });
   }
 
