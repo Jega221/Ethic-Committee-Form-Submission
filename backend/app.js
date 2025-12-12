@@ -22,8 +22,8 @@ const adminRouter = require('./routes/admin');
 const getDataRouter = require('./routes/getData');
 const setRoleRouter = require('./routes/roles');
 const messagingRoutes = require('./routes/messaging');
-const facultyRouter= require('./routes/faculty');
-const workflowRouter= require('./routes/workflow');
+const facultyRouter = require('./routes/faculty');
+const workflowRouter = require('./routes/workflow');
 // const authMiddleware = require('./middlewares/authMiddleware'); // optional future use
 
 // === ROUTES SETUP ===
@@ -35,8 +35,8 @@ app.use('/api/admin', adminRouter);
 app.use('/api/getData', getDataRouter);
 app.use('/api/Role', setRoleRouter);
 app.use('/api/messaging', messagingRoutes);
-app.use('/api/faculty',facultyRouter);
-app.use('/api/workflow',workflowRouter);
+app.use('/api/faculty', facultyRouter);
+app.use('/api/workflow', workflowRouter);
 
 
 

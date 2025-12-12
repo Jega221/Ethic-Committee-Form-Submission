@@ -116,11 +116,5 @@ router.post('/admin/signup', verifyToken, isSuperAdmin, async (req, res) => {
   }
 });
 
-/**
- * Example protected route
- */
-router.get('/superadmin/dashboard', verifyToken, isSuperAdmin, (req, res) => {
-  res.json({ message: 'Welcome to the Super Admin dashboard!' });
-});
 
 module.exports = router;
