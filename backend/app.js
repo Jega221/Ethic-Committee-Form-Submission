@@ -7,6 +7,7 @@ const getDataRouter = require('./routes/getData');
 const setRoleRouter= require('./routes/roles');
 const facultyRouter= require('./routes/faculty');
 const workflowRouter= require('./routes/workflow');
+const processRouter= require('./routes/process');
 
 
 //const authMiddleware = require('./middlewares/authMiddleware');
@@ -31,6 +32,7 @@ app.use('/api/Role',setRoleRouter);
 app.use('/api/faculty',facultyRouter);
 //app.use('/api/users', authMiddleware, usersRouter);
 app.use('/api/workflow',workflowRouter);
+app.use('/api/process',processRouter);
 
 // Start server
 app.listen(PORT, () => {
