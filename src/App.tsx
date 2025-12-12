@@ -12,6 +12,8 @@ import UploadedFiles from "./pages/UploadedFiles";
 import StudyStatus from "./pages/StudyStatus";
 import Agenda from "./pages/Agenda";
 import Settings from "./pages/Settings";
+import AdminDashboard from "./pages/AdminDashboard";
+import ReviewOversight from "./pages/ReviewOversight";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -22,19 +24,26 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/new-application" element={<NewApplication />} />
-          <Route path="/uploaded-files" element={<UploadedFiles />} />
-          <Route path="/study-status" element={<StudyStatus />} />
-          <Route path="/agenda" element={<Agenda />} />
-          <Route path="/settings" element={<Settings />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+      <Routes>
+  <Route path="/" element={<Index />} />
+  <Route path="/login" element={<Login />} />
+  <Route path="/signup" element={<Signup />} />
+  <Route path="/dashboard" element={<Dashboard />} />
+  <Route path="/new-application" element={<NewApplication />} />
+  <Route path="/uploaded-files" element={<UploadedFiles />} />
+  <Route path="/study-status" element={<StudyStatus />} />
+  <Route path="/agenda" element={<Agenda />} />
+  <Route path="/settings" element={<Settings />} />
+
+  {/* FIX HERE */}
+  <Route path="/admin" element={<AdminDashboard />} />
+  <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+  <Route path="/admin/review-oversight" element={<ReviewOversight />} />
+  
+  <Route path="*" element={<NotFound />} />
+</Routes>
+
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
