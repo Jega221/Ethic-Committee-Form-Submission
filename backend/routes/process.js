@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
 // Add process action endpoint (approve/rejected)
-router.post('/process', async (req, res) => {
+router.post('/', async (req, res) => {
   const { application_id, action } = req.body;
   // Authorization: token in Authorization header (supports "Bearer <token>" or raw token)
   try {
