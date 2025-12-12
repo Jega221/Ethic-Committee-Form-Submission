@@ -1,3 +1,4 @@
+// frontend/src/pages/Signup.tsx
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
@@ -5,9 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { apiRequest } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [firstName, setFirstName] = useState('');
   const [surname, setSurname] = useState('');
   const [faculty, setFaculty] = useState('');
@@ -16,26 +20,71 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Map faculty name to faculty_id
+  const facultyMap: { [key: string]: number } = {
+    engineering: 1,
+    medicine: 2,
+    arts: 3,
+    business: 4,
+    law: 5,
+    education: 6,
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate passwords match
+    if (password !== confirmPassword) {
+      toast({
+        title: "Error",
+        description: "Passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
-    
-    // Save user profile to localStorage
-    const userProfile = {
-      firstName,
-      surname,
-      email,
-      faculty,
-    };
-    localStorage.setItem('userProfile', JSON.stringify(userProfile));
-    
-    // Clear any previous submitted applications for new user
-    localStorage.removeItem('submittedApplications');
-    
-    setTimeout(() => {
+
+    try {
+      const payload = {
+        name: firstName,
+        surname: surname,
+        faculty_id: facultyMap[faculty] || 1,
+        email: email,
+        password: password,
+        role_id: 3, // Default researcher role
+      };
+
+      const data = await apiRequest<{ token: string; user: any }>(
+        "/api/auth/signup",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      );
+
+      console.log("Signup success:", data);
+
+      // Store token
+      localStorage.setItem("token", data.token);
+      localStorage.setItem("user", JSON.stringify(data.user));
+
+      toast({
+        title: "Success",
+        description: "Account created successfully",
+      });
+
+      navigate("/dashboard");
+    } catch (err: any) {
+      console.error(err);
+      toast({
+        title: "Signup failed",
+        description: err.message || "An error occurred",
+        variant: "destructive",
+      });
+    } finally {
       setIsLoading(false);
-      navigate('/dashboard');
-    }, 1000);
+    }
   };
 
   return (

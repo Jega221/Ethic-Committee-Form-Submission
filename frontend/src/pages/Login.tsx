@@ -6,12 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { apiRequest } from '@/lib/api';
 import fiuLogo from '@/assets/fiu-login-logo.png';
+import { useToast } from '@/hooks/use-toast';
 
 const Login = () => {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,7 +26,7 @@ const Login = () => {
       };
 
       const data = await apiRequest<{ token: string; user: any }>(
-        "/auth/login",
+        "/api/auth/login",
         {
           method: "POST",
           body: JSON.stringify(body),
