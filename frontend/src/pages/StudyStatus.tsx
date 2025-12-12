@@ -3,6 +3,7 @@
 import { CheckCircle, FileText, Download, Calendar, MessageSquare, Eye, User, BookOpen, Users, Shield } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
+import { getResearcherApplications } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Loader } from '@/components/ui/loader';
 
 interface SubmittedApplication {
   id: string;
@@ -69,20 +71,39 @@ export default function StudyStatus() {
   const [applications, setApplications] = useState<SubmittedApplication[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
+  /* API Integration */
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('submittedApplications');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setApplications(parsed);
+    const fetchApplications = async () => {
+      try {
+        const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+        if (userProfile.id) {
+          // Import dynamically or at top-level. Assuming getResearcherApplications is imported
+          const res = await getResearcherApplications(userProfile.id);
+          // Map API response to UI model if needed. 
+          // Assuming API returns array of applications which mostly match our interface.
+          // We might need to transform `application_id` to `id`, etc.
+          const mappedApps = res.data.map((app: any) => ({
+            id: String(app.application_id), // Use backend ID
+            title: app.title,
+            status: app.status, // e.g. "Pending", "Faculty Review"
+            submissionDate: new Date(app.submission_date).toLocaleDateString(),
+            documents: (app.documents || []).map((doc: any) => ({
+              type: doc.file_type || 'Document',
+              fileName: doc.file_name || 'Unknown'
+            })).filter((d: any) => d.fileName)
+          }));
+
+          setApplications(mappedApps);
         }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      // malformed localStorage — ignore and keep empty
-      // Optionally: localStorage.removeItem('submittedApplications');
-      console.error('Failed to parse submittedApplications from localStorage', err);
-    }
+    };
+    fetchApplications();
   }, []);
 
   const latestApplication = applications.length > 0 ? applications[applications.length - 1] : null;
@@ -97,18 +118,31 @@ export default function StudyStatus() {
     userProfile = {};
   }
 
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="flex h-screen w-full bg-background">
+          <DashboardSidebar />
+          <main className="flex-1 flex items-center justify-center">
+            <Loader />
+          </main>
+        </div>
+      </SidebarProvider>
+    );
+  }
+
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-background">
+      <div className="flex h-screen w-full bg-background">
         <DashboardSidebar />
-
-        <main className="flex-1 p-6 md:p-8">
-          <SidebarTrigger className="mb-6" />
-
-          <div className="max-w-5xl">
-            <h1 className="text-destructive text-lg font-semibold tracking-wide uppercase mb-6">
-              Submission Status
-            </h1>
+        <main className="flex-1 overflow-y-auto w-full">
+          <div className="p-8 max-w-7xl mx-auto space-y-8">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-foreground tracking-tight">Study Status</h1>
+                <p className="text-muted-foreground mt-2">Track the progress of your ethics committee application</p>
+              </div>
+            </div>
 
             {latestApplication ? (
               <>
@@ -184,7 +218,7 @@ export default function StudyStatus() {
                       {/* Connecting Line - Background */}
                       <div className="absolute top-5 left-[10%] right-[10%] h-1 bg-muted rounded-full" />
                       {/* Connecting Line - Progress */}
-                      <div 
+                      <div
                         className="absolute top-5 left-[10%] h-1 bg-success rounded-full transition-all duration-500"
                         style={{ width: `${progressPercent}%` }}
                       />
@@ -206,13 +240,12 @@ export default function StudyStatus() {
                               <span className="text-sm font-semibold">{index + 1}</span>
                             )}
                           </div>
-                          <span className={`text-xs mt-3 text-center font-medium ${ 
-                            index < currentStatusIndex 
-                              ? 'text-success' 
-                              : index === currentStatusIndex 
-                              ? 'text-destructive' 
+                          <span className={`text-xs mt-3 text-center font-medium ${index < currentStatusIndex
+                            ? 'text-success'
+                            : index === currentStatusIndex
+                              ? 'text-destructive'
                               : 'text-muted-foreground'
-                          }`}>
+                            }`}>
                             {step.label}
                           </span>
                           {index === currentStatusIndex && (
@@ -263,8 +296,8 @@ export default function StudyStatus() {
 
                 {/* Action Button */}
                 <div className="flex justify-center">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="lg"
                     onClick={() => setIsViewModalOpen(true)}
                     className="w-full md:w-1/2 py-6 border-2 border-destructive text-destructive font-semibold hover:bg-destructive hover:text-destructive-foreground transition-all"
@@ -307,8 +340,8 @@ export default function StudyStatus() {
                             <div>
                               <p className="text-xs text-muted-foreground">Full Name</p>
                               <p className="text-foreground font-medium">
-                                {userProfile.firstName && userProfile.surname 
-                                  ? `${userProfile.firstName} ${userProfile.surname}` 
+                                {userProfile.firstName && userProfile.surname
+                                  ? `${userProfile.firstName} ${userProfile.surname}`
                                   : latestApplication.applicantName || 'Not specified'}
                               </p>
                             </div>

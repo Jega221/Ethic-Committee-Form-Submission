@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { createApplication } from '@/lib/api';
 import { z } from 'zod';
 
 const applicantSchema = z.object({
@@ -57,7 +58,7 @@ const NewApplicationContent = () => {
   const { setOpen } = useSidebar();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('applicant');
-const [documentFiles, setDocumentFiles] = useState<{
+  const [documentFiles, setDocumentFiles] = useState<{
     informedConsent: File | null;
     researchProtocol: File | null;
     dataCollection: File | null;
@@ -73,7 +74,7 @@ const [documentFiles, setDocumentFiles] = useState<{
   const [draggingField, setDraggingField] = useState<string | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [referenceNumber, setReferenceNumber] = useState('');
-const fileInputRefs = {
+  const fileInputRefs = {
     informedConsent: React.useRef<HTMLInputElement>(null),
     researchProtocol: React.useRef<HTMLInputElement>(null),
     dataCollection: React.useRef<HTMLInputElement>(null),
@@ -194,7 +195,7 @@ const fileInputRefs = {
   const handleDocumentsNext = () => {
     const requiredDocs = ['informedConsent', 'researchProtocol', 'dataCollection'] as const;
     const missingDocs = requiredDocs.filter(doc => !documentFiles[doc]);
-    
+
     if (missingDocs.length > 0) {
       const docNames: Record<string, string> = {
         informedConsent: 'Informed Consent Form',
@@ -214,61 +215,64 @@ const fileInputRefs = {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  /* API submission */
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       submitSchema.parse(submitData);
-      const refNum = `EC-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999) + 1000).padStart(4, '0')}`;
-      setReferenceNumber(refNum);
-      
-      // Save submission to localStorage
-      const submissionData = {
-        id: refNum,
-        title: researchData.projectTitle,
-        submittedDate: new Date().toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        }),
-        status: 'Under Faculty Review',
-        documents: [
-          documentFiles.informedConsent && { 
-            type: 'Informed Consent Form', 
-            fileName: documentFiles.informedConsent.name 
-          },
-          documentFiles.researchProtocol && { 
-            type: 'Research Protocol', 
-            fileName: documentFiles.researchProtocol.name 
-          },
-          documentFiles.dataCollection && { 
-            type: 'Data Collection Instruments', 
-            fileName: documentFiles.dataCollection.name 
-          },
-          documentFiles.institutionalApprovals && { 
-            type: 'Institutional Approval', 
-            fileName: documentFiles.institutionalApprovals.name 
-          },
-          documentFiles.otherDocuments && { 
-            type: 'Other Documentation', 
-            fileName: documentFiles.otherDocuments.name 
-          },
-        ].filter(Boolean),
-      };
-      
-      const existingSubmissions = JSON.parse(localStorage.getItem('submittedApplications') || '[]');
-      existingSubmissions.push(submissionData);
-      localStorage.setItem('submittedApplications', JSON.stringify(existingSubmissions));
-      
-      setIsSubmitted(true);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast({
-          title: "Validation Error",
-          description: error.errors[0].message,
-          variant: "destructive",
-        });
+
+      const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+      if (!userProfile.id) {
+        toast({ title: 'Error', description: 'User ID not found. Please login again.', variant: 'destructive' });
+        return;
       }
+
+      const formData = new FormData();
+      formData.append('user_id', userProfile.id);
+      formData.append('faculty_id', userProfile.faculty_id ? String(userProfile.faculty_id) : '1'); // Fallback or handle appropriately
+      formData.append('committee_id', '1'); // Default or selectable
+      formData.append('title', researchData.projectTitle);
+      formData.append('description', researchData.projectDescription);
+
+      // Append other fields as JSON or individual fields if needed by backend, 
+      // currently backend mainly uses title/desc/ids.
+      // If backend needs more fields, update backend schema or append here.
+
+      const filesToUpload = [
+        documentFiles.informedConsent,
+        documentFiles.researchProtocol,
+        documentFiles.dataCollection,
+        documentFiles.institutionalApprovals,
+        documentFiles.otherDocuments
+      ].filter(Boolean);
+
+      filesToUpload.forEach(file => {
+        if (file) formData.append('documents', file);
+      });
+
+      const response = await createApplication(formData);
+      const newApp = response.data.application;
+
+      setReferenceNumber(String(newApp.application_id)); // Use real ID
+
+      // Optionally keep localStorage for offline fallback or simple history? 
+      // For now, let's rely on backend source of truth.
+      setIsSubmitted(true);
+
+      toast({
+        title: "Success",
+        description: "Application submitted successfully!",
+      });
+
+    } catch (error: any) {
+      console.error(error);
+      const msg = error instanceof z.ZodError ? error.errors[0].message : (error.message || "Submission failed");
+      toast({
+        title: "Error",
+        description: msg,
+        variant: "destructive",
+      });
     }
   };
 
@@ -414,7 +418,7 @@ const fileInputRefs = {
                       id="firstName"
                       placeholder="Enter your first name"
                       value={applicantData.firstName}
-                      onChange={(e) => setApplicantData({...applicantData, firstName: e.target.value})}
+                      onChange={(e) => setApplicantData({ ...applicantData, firstName: e.target.value })}
                       required
                     />
                   </div>
@@ -424,7 +428,7 @@ const fileInputRefs = {
                       id="lastName"
                       placeholder="Enter your last name"
                       value={applicantData.lastName}
-                      onChange={(e) => setApplicantData({...applicantData, lastName: e.target.value})}
+                      onChange={(e) => setApplicantData({ ...applicantData, lastName: e.target.value })}
                       required
                     />
                   </div>
@@ -438,7 +442,7 @@ const fileInputRefs = {
                       type="email"
                       placeholder="your.email@fiu.edu"
                       value={applicantData.email}
-                      onChange={(e) => setApplicantData({...applicantData, email: e.target.value})}
+                      onChange={(e) => setApplicantData({ ...applicantData, email: e.target.value })}
                       required
                     />
                   </div>
@@ -449,7 +453,7 @@ const fileInputRefs = {
                       type="tel"
                       placeholder="+90 XXX XXX XX XX"
                       value={applicantData.phone}
-                      onChange={(e) => setApplicantData({...applicantData, phone: e.target.value})}
+                      onChange={(e) => setApplicantData({ ...applicantData, phone: e.target.value })}
                       required
                     />
                   </div>
@@ -458,9 +462,9 @@ const fileInputRefs = {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="department">Department *</Label>
-                    <Select 
+                    <Select
                       value={applicantData.department}
-                      onValueChange={(value) => setApplicantData({...applicantData, department: value})}
+                      onValueChange={(value) => setApplicantData({ ...applicantData, department: value })}
                       required
                     >
                       <SelectTrigger id="department">
@@ -477,9 +481,9 @@ const fileInputRefs = {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="position">Position *</Label>
-                    <Select 
+                    <Select
                       value={applicantData.position}
-                      onValueChange={(value) => setApplicantData({...applicantData, position: value})}
+                      onValueChange={(value) => setApplicantData({ ...applicantData, position: value })}
                       required
                     >
                       <SelectTrigger id="position">
@@ -497,7 +501,7 @@ const fileInputRefs = {
                 </div>
 
                 <div className="flex justify-end pt-4">
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -524,7 +528,7 @@ const fileInputRefs = {
                     id="projectTitle"
                     placeholder="Enter the title of your research project"
                     value={researchData.projectTitle}
-                    onChange={(e) => setResearchData({...researchData, projectTitle: e.target.value})}
+                    onChange={(e) => setResearchData({ ...researchData, projectTitle: e.target.value })}
                     required
                   />
                 </div>
@@ -536,7 +540,7 @@ const fileInputRefs = {
                     placeholder="Provide a detailed description of your research project, including objectives, methodology, and expected outcomes"
                     className="min-h-[150px]"
                     value={researchData.projectDescription}
-                    onChange={(e) => setResearchData({...researchData, projectDescription: e.target.value})}
+                    onChange={(e) => setResearchData({ ...researchData, projectDescription: e.target.value })}
                     required
                   />
                   <p className="text-sm text-muted-foreground">Minimum 50 characters required</p>
@@ -544,9 +548,9 @@ const fileInputRefs = {
 
                 <div className="space-y-2">
                   <Label htmlFor="researchType">Research Type *</Label>
-                  <Select 
+                  <Select
                     value={researchData.researchType}
-                    onValueChange={(value) => setResearchData({...researchData, researchType: value})}
+                    onValueChange={(value) => setResearchData({ ...researchData, researchType: value })}
                     required
                   >
                     <SelectTrigger id="researchType">
@@ -569,7 +573,7 @@ const fileInputRefs = {
                       id="startDate"
                       type="date"
                       value={researchData.startDate}
-                      onChange={(e) => setResearchData({...researchData, startDate: e.target.value})}
+                      onChange={(e) => setResearchData({ ...researchData, startDate: e.target.value })}
                       required
                     />
                   </div>
@@ -579,7 +583,7 @@ const fileInputRefs = {
                       id="endDate"
                       type="date"
                       value={researchData.endDate}
-                      onChange={(e) => setResearchData({...researchData, endDate: e.target.value})}
+                      onChange={(e) => setResearchData({ ...researchData, endDate: e.target.value })}
                       required
                     />
                   </div>
@@ -591,20 +595,20 @@ const fileInputRefs = {
                     id="fundingSource"
                     placeholder="Enter funding source"
                     value={researchData.fundingSource}
-                    onChange={(e) => setResearchData({...researchData, fundingSource: e.target.value})}
+                    onChange={(e) => setResearchData({ ...researchData, fundingSource: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={() => setActiveTab('applicant')}
                     variant="outline"
                   >
                     Previous
                   </Button>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -632,16 +636,16 @@ const fileInputRefs = {
                     type="number"
                     placeholder="e.g., 50"
                     value={participantsData.participantCount}
-                    onChange={(e) => setParticipantsData({...participantsData, participantCount: e.target.value})}
+                    onChange={(e) => setParticipantsData({ ...participantsData, participantCount: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="ageGroup">Participant Age Group *</Label>
-                  <Select 
+                  <Select
                     value={participantsData.ageGroup}
-                    onValueChange={(value) => setParticipantsData({...participantsData, ageGroup: value})}
+                    onValueChange={(value) => setParticipantsData({ ...participantsData, ageGroup: value })}
                     required
                   >
                     <SelectTrigger id="ageGroup">
@@ -664,7 +668,7 @@ const fileInputRefs = {
                     placeholder="Describe how you will recruit participants for your study"
                     className="min-h-[120px]"
                     value={participantsData.recruitmentMethod}
-                    onChange={(e) => setParticipantsData({...participantsData, recruitmentMethod: e.target.value})}
+                    onChange={(e) => setParticipantsData({ ...participantsData, recruitmentMethod: e.target.value })}
                     required
                   />
                 </div>
@@ -676,20 +680,20 @@ const fileInputRefs = {
                     placeholder="If your study involves vulnerable populations (e.g., prisoners, pregnant women, mentally disabled), please describe the additional protections you will implement"
                     className="min-h-[120px]"
                     value={participantsData.vulnerablePopulations}
-                    onChange={(e) => setParticipantsData({...participantsData, vulnerablePopulations: e.target.value})}
+                    onChange={(e) => setParticipantsData({ ...participantsData, vulnerablePopulations: e.target.value })}
                   />
                   <p className="text-sm text-muted-foreground">Leave blank if not applicable</p>
                 </div>
 
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={() => setActiveTab('research')}
                     variant="outline"
                   >
                     Previous
                   </Button>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -712,11 +716,11 @@ const fileInputRefs = {
               <form onSubmit={(e) => { e.preventDefault(); handleEthicsNext(); }} className="space-y-6">
                 <div className="space-y-6">
                   <div className="flex items-start space-x-3 p-4 border border-border rounded-lg bg-background">
-                    <Checkbox 
-                      id="informedConsent" 
+                    <Checkbox
+                      id="informedConsent"
                       checked={ethicsData.informedConsent}
-                      onCheckedChange={(checked) => setEthicsData({...ethicsData, informedConsent: checked as boolean})}
-                      required 
+                      onCheckedChange={(checked) => setEthicsData({ ...ethicsData, informedConsent: checked as boolean })}
+                      required
                     />
                     <div className="space-y-1">
                       <Label htmlFor="informedConsent" className="text-base font-semibold cursor-pointer">
@@ -729,11 +733,11 @@ const fileInputRefs = {
                   </div>
 
                   <div className="flex items-start space-x-3 p-4 border border-border rounded-lg bg-background">
-                    <Checkbox 
-                      id="dataConfidentiality" 
+                    <Checkbox
+                      id="dataConfidentiality"
                       checked={ethicsData.dataConfidentiality}
-                      onCheckedChange={(checked) => setEthicsData({...ethicsData, dataConfidentiality: checked as boolean})}
-                      required 
+                      onCheckedChange={(checked) => setEthicsData({ ...ethicsData, dataConfidentiality: checked as boolean })}
+                      required
                     />
                     <div className="space-y-1">
                       <Label htmlFor="dataConfidentiality" className="text-base font-semibold cursor-pointer">
@@ -753,7 +757,7 @@ const fileInputRefs = {
                     placeholder="Describe any potential risks to participants and how you will minimize them"
                     className="min-h-[120px]"
                     value={ethicsData.riskAssessment}
-                    onChange={(e) => setEthicsData({...ethicsData, riskAssessment: e.target.value})}
+                    onChange={(e) => setEthicsData({ ...ethicsData, riskAssessment: e.target.value })}
                     required
                   />
                 </div>
@@ -765,20 +769,20 @@ const fileInputRefs = {
                     placeholder="Describe the potential benefits of this research to participants and/or society"
                     className="min-h-[120px]"
                     value={ethicsData.expectedBenefits}
-                    onChange={(e) => setEthicsData({...ethicsData, expectedBenefits: e.target.value})}
+                    onChange={(e) => setEthicsData({ ...ethicsData, expectedBenefits: e.target.value })}
                     required
                   />
                 </div>
 
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={() => setActiveTab('participants')}
                     variant="outline"
                   >
                     Previous
                   </Button>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -829,10 +833,9 @@ const fileInputRefs = {
                       <Button type="button" variant="ghost" size="sm" onClick={removeFile('informedConsent')} className="h-8 w-8 p-0">×</Button>
                     </div>
                   ) : (
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                        draggingField === 'informedConsent' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${draggingField === 'informedConsent' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        }`}
                       onClick={handleUploadClick('informedConsent')}
                       onDragOver={handleDragOver('informedConsent')}
                       onDragLeave={handleDragLeave}
@@ -868,10 +871,9 @@ const fileInputRefs = {
                       <Button type="button" variant="ghost" size="sm" onClick={removeFile('researchProtocol')} className="h-8 w-8 p-0">×</Button>
                     </div>
                   ) : (
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                        draggingField === 'researchProtocol' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${draggingField === 'researchProtocol' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        }`}
                       onClick={handleUploadClick('researchProtocol')}
                       onDragOver={handleDragOver('researchProtocol')}
                       onDragLeave={handleDragLeave}
@@ -907,10 +909,9 @@ const fileInputRefs = {
                       <Button type="button" variant="ghost" size="sm" onClick={removeFile('dataCollection')} className="h-8 w-8 p-0">×</Button>
                     </div>
                   ) : (
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                        draggingField === 'dataCollection' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${draggingField === 'dataCollection' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        }`}
                       onClick={handleUploadClick('dataCollection')}
                       onDragOver={handleDragOver('dataCollection')}
                       onDragLeave={handleDragLeave}
@@ -946,10 +947,9 @@ const fileInputRefs = {
                       <Button type="button" variant="ghost" size="sm" onClick={removeFile('institutionalApprovals')} className="h-8 w-8 p-0">×</Button>
                     </div>
                   ) : (
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                        draggingField === 'institutionalApprovals' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${draggingField === 'institutionalApprovals' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        }`}
                       onClick={handleUploadClick('institutionalApprovals')}
                       onDragOver={handleDragOver('institutionalApprovals')}
                       onDragLeave={handleDragLeave}
@@ -985,10 +985,9 @@ const fileInputRefs = {
                       <Button type="button" variant="ghost" size="sm" onClick={removeFile('otherDocuments')} className="h-8 w-8 p-0">×</Button>
                     </div>
                   ) : (
-                    <div 
-                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                        draggingField === 'otherDocuments' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
-                      }`}
+                    <div
+                      className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${draggingField === 'otherDocuments' ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50'
+                        }`}
                       onClick={handleUploadClick('otherDocuments')}
                       onDragOver={handleDragOver('otherDocuments')}
                       onDragLeave={handleDragLeave}
@@ -1005,22 +1004,22 @@ const fileInputRefs = {
                   <AlertDescription className="text-sm">
                     <span className="font-semibold text-foreground">Note:</span>{' '}
                     <span className="text-foreground">
-                      All documents must be in English or accompanied by certified translations. 
+                      All documents must be in English or accompanied by certified translations.
                       Please ensure all participant information is de-identified in uploaded documents.
                     </span>
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={() => setActiveTab('ethics')}
                     variant="outline"
                   >
                     Previous
                   </Button>
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={handleDocumentsNext}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
@@ -1067,11 +1066,11 @@ const fileInputRefs = {
 
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3 p-6 border border-border rounded-lg bg-background">
-                    <Checkbox 
-                      id="accuracyDeclaration" 
+                    <Checkbox
+                      id="accuracyDeclaration"
                       checked={submitData.accuracyDeclaration}
-                      onCheckedChange={(checked) => setSubmitData({...submitData, accuracyDeclaration: checked as boolean})}
-                      required 
+                      onCheckedChange={(checked) => setSubmitData({ ...submitData, accuracyDeclaration: checked as boolean })}
+                      required
                     />
                     <div className="space-y-1">
                       <Label htmlFor="accuracyDeclaration" className="text-base font-semibold cursor-pointer">
@@ -1084,11 +1083,11 @@ const fileInputRefs = {
                   </div>
 
                   <div className="flex items-start space-x-3 p-6 border border-border rounded-lg bg-background">
-                    <Checkbox 
-                      id="complianceAgreement" 
+                    <Checkbox
+                      id="complianceAgreement"
                       checked={submitData.complianceAgreement}
-                      onCheckedChange={(checked) => setSubmitData({...submitData, complianceAgreement: checked as boolean})}
-                      required 
+                      onCheckedChange={(checked) => setSubmitData({ ...submitData, complianceAgreement: checked as boolean })}
+                      required
                     />
                     <div className="space-y-1">
                       <Label htmlFor="complianceAgreement" className="text-base font-semibold cursor-pointer">
@@ -1105,21 +1104,21 @@ const fileInputRefs = {
                   <AlertDescription className="text-sm">
                     <span className="font-semibold text-foreground">Note:</span>{' '}
                     <span className="text-foreground">
-                      All documents must be in English or accompanied by certified translations. 
+                      All documents must be in English or accompanied by certified translations.
                       Please ensure all participant information is de-identified in uploaded documents.
                     </span>
                   </AlertDescription>
                 </Alert>
 
                 <div className="flex justify-between pt-4">
-                  <Button 
-                    type="button" 
+                  <Button
+                    type="button"
                     onClick={() => setActiveTab('documents')}
                     variant="outline"
                   >
                     Previous
                   </Button>
-                  <Button 
+                  <Button
                     type="submit"
                     className="bg-foreground text-background hover:bg-foreground/90"
                   >

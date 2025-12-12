@@ -20,9 +20,9 @@ async function submitApplication(req, res) {
     return res.status(400).json({ error: "All form fields are required." });
   }
 
-  if (!files.length || files.length < 5) {
+  if (!files.length || files.length < 1) {
     return res.status(400).json({
-      error: "At least 5 documents are required (e.g., proposal and consent form)."
+      error: "At least 1 document is required."
     });
   }
 
@@ -56,6 +56,17 @@ async function submitApplication(req, res) {
         fileUrl
       ]);
       docRows.push(docRes.rows[0]);
+    }
+
+    // 3️⃣ Initialize Workflow Process
+    const wfRes = await pool.query("SELECT * FROM workflow WHERE status = 'current'");
+    if (wfRes.rows.length > 0) {
+      const workflow = wfRes.rows[0];
+      await pool.query(
+        `INSERT INTO process (application_id, workflow_id, current_step, next_step)
+         VALUES ($1, $2, $3, $4)`,
+        [application.application_id, workflow.id, workflow.first_step, workflow.second_step]
+      );
     }
 
     res.status(201).json({ message: "Application submitted successfully", application, documents: docRows });
@@ -105,7 +116,7 @@ async function updateApplicationStatus(req, res) {
     `;
     const appResult = await pool.query(updateQuery, [status, id]);
     const updatedApp = appResult.rows[0];
-    
+
     if (!updatedApp) {
       return res.status(404).json({ error: "Application not found" });
     }
@@ -197,7 +208,7 @@ async function modifyApplication(req, res) {
 
     // Only allowed when status = Revision Requested
     if (app.status !== "Revision Requested") {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: "Application cannot be modified unless it is in 'Revision Requested' status."
       });
     }
@@ -252,5 +263,5 @@ module.exports = {
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
-  modifyApplication 
+  modifyApplication
 };

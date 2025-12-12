@@ -36,6 +36,7 @@ const Login = () => {
       console.log("Login success:", data);
 
       localStorage.setItem("token", data.token);
+      localStorage.setItem("userProfile", JSON.stringify(data.user));
 
       alert("Login successful");
       navigate("/dashboard");
@@ -89,7 +90,7 @@ const Login = () => {
               required
               className="h-14 bg-white border border-[#d0d5dd] rounded-lg px-4 text-base placeholder:text-[#98a2b3]"
             />
-            
+
             <Input
               type="password"
               placeholder="password"

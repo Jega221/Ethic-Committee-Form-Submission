@@ -2,14 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const { 
-  submitApplication, 
-  getAllApplications, 
+const {
+  submitApplication,
+  getAllApplications,
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
   modifyApplication
- } = require('../controllers/applicationController');
+} = require('../controllers/applicationController');
 const pool = require('../db/index');
 
 // set up multer to store files in backend/uploads temporarily
@@ -35,7 +35,17 @@ router.get('/researcher/:id', async (req, res) => {
         a.title,
         a.description,
         a.status,
-        a.submission_date
+        a.submission_date,
+        (
+          SELECT json_agg(json_build_object(
+            'document_id', d.document_id,
+            'file_name', d.file_name,
+            'file_type', d.file_type,
+            'file_url', d.file_url
+          ))
+          FROM documents d
+          WHERE d.application_id = a.application_id
+        ) AS documents
       FROM application a
       WHERE a.researcher_id = $1
       ORDER BY a.submission_date DESC`,

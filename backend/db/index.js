@@ -25,5 +25,11 @@ const pool = new Pool({
   },
 });
 
+// Add error handler to prevent crashing on idle client errors
+pool.on('error', (err, client) => {
+  console.error('Unexpected error on idle client', err);
+  // Do not exit process, just log it
+});
+
 module.exports = pool;
 

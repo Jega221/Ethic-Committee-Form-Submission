@@ -64,9 +64,10 @@ async function checkPendingApplications() {
   console.log('✅ 48-hour pending check complete.\n');
 }
 
-// Run every minute for testing
-cron.schedule('* * * * *', async () => {
-  await checkPendingApplications();
-});
+// // Run every minute for testing
+// cron.schedule('* * * * *', async () => {
+//   await checkPendingApplications();
+// });
+// console.log('🚀 Cron job started. Checking pending applications every minute...');
 
-console.log('🚀 Cron job started. Checking pending applications every minute...');
+module.exports = checkPendingApplications;

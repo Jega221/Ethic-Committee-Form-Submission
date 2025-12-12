@@ -58,7 +58,6 @@ export async function authRequest<T>(
 // 4) Axios instance (for advanced requests like file upload)
 export const api = axios.create({
   baseURL: API_BASE_URL,
-  withCredentials: true,
 });
 
 // Automatically add token to axios requests
@@ -79,6 +78,12 @@ export async function login(email: string, password: string) {
 }
 
 // 6) Create application helper
-export async function createApplication(payload: any) {
-  return api.post("/applications", payload);
+// 6) Create application helper
+export async function createApplication(payload: FormData) {
+  return api.post("/api/applications", payload);
+}
+
+// 7) Get researcher applications
+export async function getResearcherApplications(userId: string | number) {
+  return api.get(`/api/applications/researcher/${userId}`);
 }

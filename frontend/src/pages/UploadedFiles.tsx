@@ -4,6 +4,7 @@ import { Bell, FileText, Download } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Badge } from '@/components/ui/badge';
+import { Loader } from '@/components/ui/loader';
 
 interface Document {
   type: string;
@@ -21,11 +22,43 @@ interface Application {
 const UploadedFiles = () => {
   const [applications, setApplications] = useState<Application[]>([]);
 
+  /* API Integration */
+  const [loading, setLoading] = useState(true);
+
+  // import { getResearcherApplications } from '@/lib/api'; // Add import if not present
+
   useEffect(() => {
-    const storedApplications = localStorage.getItem('submittedApplications');
-    if (storedApplications) {
-      setApplications(JSON.parse(storedApplications));
-    }
+    const fetchApplications = async () => {
+      try {
+        const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+        if (userProfile.id) {
+          // Import dynamically or at top-level. 
+          const { getResearcherApplications } = await import('@/lib/api');
+          const res = await getResearcherApplications(userProfile.id);
+
+          // Map API response to UI model
+          // Backend now returns nested documents array inside each application row
+          const mappedApps = res.data.map((app: any) => ({
+            id: String(app.application_id),
+            title: app.title,
+            submittedDate: new Date(app.submission_date || Date.now()).toLocaleDateString(),
+            status: app.status,
+            // Handle case where documents might be null from LEFT JOIN/json_agg
+            documents: (app.documents || []).map((doc: any) => ({
+              type: doc.file_type || 'Document',
+              fileName: doc.file_name || 'Unknown'
+            })).filter((d: any) => d.fileName)
+          }));
+
+          setApplications(mappedApps);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchApplications();
   }, []);
 
   const handleDownload = (fileName: string) => {
@@ -33,11 +66,15 @@ const UploadedFiles = () => {
     console.log('Downloading:', fileName);
   };
 
+  if (loading) {
+    return <Loader fullScreen />;
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-secondary/30">
         <DashboardSidebar />
-        
+
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="bg-card border-b border-border px-4 py-4">
@@ -48,7 +85,7 @@ const UploadedFiles = () => {
                   Final International University Ethic committee
                 </h1>
               </div>
-              
+
               <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
                 <Bell className="w-6 h-6 text-foreground" />
                 <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -73,8 +110,8 @@ const UploadedFiles = () => {
             <div className="space-y-6">
               {applications.length > 0 ? (
                 applications.map((application) => (
-                  <div 
-                    key={application.id} 
+                  <div
+                    key={application.id}
                     className="bg-card rounded-lg shadow-sm border border-border p-6"
                   >
                     {/* Application Header */}
@@ -87,8 +124,8 @@ const UploadedFiles = () => {
                           {application.id} • Submitted: {application.submittedDate}
                         </p>
                       </div>
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className="bg-amber-50 text-amber-600 border-amber-200 whitespace-nowrap self-start"
                       >
                         {application.status}
@@ -102,7 +139,7 @@ const UploadedFiles = () => {
                       </p>
                       <div className="space-y-2">
                         {application.documents.map((doc, index) => (
-                          <div 
+                          <div
                             key={index}
                             className="flex items-center justify-between py-3 px-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
                           >
@@ -117,7 +154,7 @@ const UploadedFiles = () => {
                                 </p>
                               </div>
                             </div>
-                            <button 
+                            <button
                               onClick={() => handleDownload(doc.fileName)}
                               className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
                             >

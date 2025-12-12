@@ -41,27 +41,27 @@ export function DashboardSidebar() {
           <img
             src={fiuLogo}
             alt="Final International University Logo"
-            className="h-20 w-auto object-contain"
+            className="h-40 w-auto object-contain mx-auto"
           />
-          <button 
+          <button
             onClick={toggleSidebar}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
-        
+
         <Separator className="mb-6" />
 
         {/* Quick Actions */}
         <div className="flex gap-4 justify-center mb-6">
-          <button 
+          <button
             onClick={() => navigate('/settings')}
             className="p-3 hover:bg-accent rounded-lg transition-colors"
           >
             <Settings className="w-5 h-5 text-muted-foreground" />
           </button>
-          <button 
+          <button
             onClick={() => navigate('/agenda')}
             className="p-3 hover:bg-accent rounded-lg transition-colors"
           >
@@ -78,9 +78,8 @@ export function DashboardSidebar() {
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   onClick={() => handleNavigation(item.url)}
-                  className={`w-full justify-start gap-3 px-4 py-3 ${
-                    isActive ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent/50'
-                  }`}
+                  className={`w-full justify-start gap-3 px-4 py-3 ${isActive ? 'bg-accent text-accent-foreground font-medium' : 'hover:bg-accent/50'
+                    }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span>{item.title}</span>
