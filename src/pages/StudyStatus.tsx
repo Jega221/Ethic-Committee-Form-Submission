@@ -1,5 +1,3 @@
-'use client';
-
 import { CheckCircle, FileText, Download, Calendar, MessageSquare, Eye, User, BookOpen, Users, Shield } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
@@ -17,10 +15,11 @@ import { Separator } from '@/components/ui/separator';
 
 interface SubmittedApplication {
   id: string;
-  title?: string;
+  title: string;
   submissionDate: string;
   status: string;
-  documents?: { type: string; fileName: string }[];
+  documents: { type: string; fileName: string }[];
+  // Extended fields from form
   applicantName?: string;
   email?: string;
   faculty?: string;
@@ -42,25 +41,15 @@ const statusSteps = [
 ];
 
 const getStatusIndex = (status: string): number => {
-  const s = status.toLowerCase();
-  if (s.includes('faculty')) return 1;
-  if (s.includes('committee') || s.includes('ethics')) return 2;
-  if (s.includes('dean')) return 3;
-  if (s.includes('approved') || s.includes('final')) return 3; // clamp to final step index
+  if (status.includes('Faculty')) return 1;
+  if (status.includes('Committee') || status.includes('Ethics')) return 2;
+  if (status.includes('Dean')) return 3;
+  if (status.includes('Approved') || status.includes('Final')) return 4;
   return 0;
 };
 
-// Use percent progress based on steps length so it always matches UI
-const calcProgressPercent = (index: number) => {
-  const maxIndex = Math.max(statusSteps.length - 1, 1);
-  const clamped = Math.max(0, Math.min(index, maxIndex));
-  return (clamped / maxIndex) * 100;
-};
-
-const getExpectedDecisionDate = (submissionDate?: string): string => {
-  if (!submissionDate) return 'Not specified';
+const getExpectedDecisionDate = (submissionDate: string): string => {
   const date = new Date(submissionDate);
-  if (Number.isNaN(date.getTime())) return 'Invalid date';
   date.setDate(date.getDate() + 30);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
@@ -70,43 +59,28 @@ export default function StudyStatus() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('submittedApplications');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setApplications(parsed);
-        }
-      }
-    } catch (err) {
-      // malformed localStorage — ignore and keep empty
-      // Optionally: localStorage.removeItem('submittedApplications');
-      console.error('Failed to parse submittedApplications from localStorage', err);
+    const saved = localStorage.getItem('submittedApplications');
+    if (saved) {
+      setApplications(JSON.parse(saved));
     }
   }, []);
 
-  const latestApplication = applications.length > 0 ? applications[applications.length - 1] : null;
-  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.status || '') : 0;
-  const progressPercent = calcProgressPercent(currentStatusIndex);
+  const latestApplication = applications[applications.length - 1];
+  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.status) : 0;
 
-  // Get user profile for additional info (safe parse)
-  let userProfile: Record<string, any> = {};
-  try {
-    userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}') || {};
-  } catch {
-    userProfile = {};
-  }
+  // Get user profile for additional info
+  const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
-
+        
         <main className="flex-1 p-6 md:p-8">
           <SidebarTrigger className="mb-6" />
-
+          
           <div className="max-w-5xl">
-            <h1 className="text-destructive text-lg font-semibold tracking-wide uppercase mb-6">
+            <h1 className="text-foreground text-lg font-semibold tracking-wide uppercase mb-6">
               Submission Status
             </h1>
 
@@ -146,7 +120,7 @@ export default function StudyStatus() {
                       Uploaded Documents
                     </h2>
                     <div className="space-y-3">
-                      {(latestApplication.documents && latestApplication.documents.length > 0) ? (
+                      {latestApplication.documents.length > 0 ? (
                         latestApplication.documents.map((doc, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-3">
@@ -183,16 +157,16 @@ export default function StudyStatus() {
                     <div className="flex items-center justify-between relative">
                       {/* Connecting Line - Background */}
                       <div className="absolute top-5 left-[10%] right-[10%] h-1 bg-muted rounded-full" />
-                      {/* Connecting Line - Progress */}
+                      {/* Connecting Line - Progress (green for completed) */}
                       <div 
                         className="absolute top-5 left-[10%] h-1 bg-success rounded-full transition-all duration-500"
-                        style={{ width: `${progressPercent}%` }}
+                        style={{ width: `${Math.min(currentStatusIndex * 26.67, 80)}%` }}
                       />
-
+                      
                       {statusSteps.map((step, index) => (
                         <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
                           <div
-                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 $ {
+                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${
                               index < currentStatusIndex
                                 ? 'bg-success border-success text-success-foreground'
                                 : index === currentStatusIndex
@@ -206,7 +180,7 @@ export default function StudyStatus() {
                               <span className="text-sm font-semibold">{index + 1}</span>
                             )}
                           </div>
-                          <span className={`text-xs mt-3 text-center font-medium ${ 
+                          <span className={`text-xs mt-3 text-center font-medium ${
                             index < currentStatusIndex 
                               ? 'text-success' 
                               : index === currentStatusIndex 
@@ -283,7 +257,7 @@ export default function StudyStatus() {
                         Submission Details
                       </DialogTitle>
                     </DialogHeader>
-
+                    
                     <ScrollArea className="max-h-[70vh] pr-4">
                       <div className="space-y-6">
                         {/* Header Info */}
@@ -410,7 +384,7 @@ export default function StudyStatus() {
                             Uploaded Documents
                           </h3>
                           <div className="space-y-2">
-                            {(latestApplication.documents && latestApplication.documents.length > 0) ? (
+                            {latestApplication.documents.length > 0 ? (
                               latestApplication.documents.map((doc, index) => (
                                 <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                                   <div className="flex items-center gap-3">

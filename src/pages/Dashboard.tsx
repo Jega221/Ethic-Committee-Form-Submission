@@ -1,14 +1,71 @@
-import React from 'react';
-import { Bell, HelpCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bell, HelpCircle, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
+const mockNotifications = [
+  {
+    id: 1,
+    type: 'approved',
+    title: 'Application Approved',
+    description: 'Your application ETH-2024-003 has been approved.',
+    time: '2 hours ago',
+    read: false,
+  },
+  {
+    id: 2,
+    type: 'revision',
+    title: 'Revision Requested',
+    description: 'Application ETH-2024-004 requires revisions.',
+    time: '1 day ago',
+    read: false,
+  },
+  {
+    id: 3,
+    type: 'rejected',
+    title: 'Application Rejected',
+    description: 'Application ETH-2024-005 has been rejected.',
+    time: '3 days ago',
+    read: true,
+  },
+];
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [notifications, setNotifications] = useState(mockNotifications);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleStartApplication = () => {
     navigate('/new-application');
+  };
+
+  const markAsRead = (id: number) => {
+    setNotifications(prev =>
+      prev.map(n => (n.id === id ? { ...n, read: true } : n))
+    );
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'approved':
+        return <CheckCircle className="w-5 h-5 text-green-600" />;
+      case 'rejected':
+        return <XCircle className="w-5 h-5 text-red-600" />;
+      case 'revision':
+        return <MessageSquare className="w-5 h-5 text-orange-600" />;
+      default:
+        return <Bell className="w-5 h-5" />;
+    }
   };
 
   return (
@@ -27,12 +84,51 @@ const Dashboard = () => {
                 </h1>
               </div>
               
-              <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
-                <Bell className="w-6 h-6 text-foreground" />
-                <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  1
-                </span>
-              </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
+                    <Bell className="w-6 h-6 text-foreground" />
+                    {unreadCount > 0 && (
+                      <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-80 bg-card border border-border z-50">
+                  <DropdownMenuLabel className="font-semibold">Notifications</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {notifications.length === 0 ? (
+                    <div className="p-4 text-center text-muted-foreground text-sm">
+                      No notifications
+                    </div>
+                  ) : (
+                    notifications.map((notification) => (
+                      <DropdownMenuItem
+                        key={notification.id}
+                        className={`flex items-start gap-3 p-3 cursor-pointer ${
+                          !notification.read ? 'bg-accent/50' : ''
+                        }`}
+                        onClick={() => markAsRead(notification.id)}
+                      >
+                        <div className="mt-0.5">{getIcon(notification.type)}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm">{notification.title}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {notification.description}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {notification.time}
+                          </p>
+                        </div>
+                        {!notification.read && (
+                          <div className="w-2 h-2 bg-destructive rounded-full mt-2" />
+                        )}
+                      </DropdownMenuItem>
+                    ))
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </header>
 

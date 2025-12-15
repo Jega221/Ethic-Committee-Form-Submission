@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Home, FileUp, BarChart3, RefreshCw, LogOut, Settings, Calendar, X } from 'lucide-react';
+import { Home, RefreshCw, LogOut, X } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import fiuLogo from '@/assets/fiu-logo.png';
 import {
@@ -21,16 +21,14 @@ import {
 } from '@/components/ui/select';
 
 const menuItems = [
-  { title: 'Home page', url: '/dashboard', icon: Home },
-  { title: 'Uploaded files', url: '/uploaded-files', icon: FileUp },
-  { title: 'Study Status', url: '/study-status', icon: BarChart3 },
+  { title: 'Home page', url: '/faculty', icon: Home },
 ];
 
-export function DashboardSidebar() {
+export function FacultySidebar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { setOpenMobile, toggleSidebar } = useSidebar();
-  const [selectedRole, setSelectedRole] = useState('researcher');
+  const [selectedRole, setSelectedRole] = useState('faculty');
 
   const handleLogout = () => {
     navigate('/');
@@ -62,22 +60,6 @@ export function DashboardSidebar() {
         </div>
         
         <Separator className="mb-6" />
-
-        {/* Quick Actions */}
-        <div className="flex gap-4 justify-center mb-6">
-          <button 
-            onClick={() => navigate('/settings')}
-            className="p-3 hover:bg-accent rounded-lg transition-colors"
-          >
-            <Settings className="w-5 h-5 text-muted-foreground" />
-          </button>
-          <button 
-            onClick={() => navigate('/agenda')}
-            className="p-3 hover:bg-accent rounded-lg transition-colors"
-          >
-            <Calendar className="w-5 h-5 text-muted-foreground" />
-          </button>
-        </div>
       </SidebarHeader>
 
       <SidebarContent className="px-3">
