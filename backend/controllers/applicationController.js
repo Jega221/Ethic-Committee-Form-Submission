@@ -88,6 +88,7 @@ async function getAllApplications(req, res) {
         a.submission_date,
         u.name AS researcher_name,
         u.surname AS researcher_surname,
+        u.email,
         f.name AS faculty_name
       FROM application a
       JOIN users u ON a.researcher_id = u.id

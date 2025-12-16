@@ -117,4 +117,74 @@ router.post('/admin/signup', verifyToken, isSuperAdmin, async (req, res) => {
 });
 
 
+/**
+ * CREATE USER (Admin Dashboard)
+ */
+router.post('/users', verifyToken, isSuperAdmin, async (req, res) => {
+  const { name, email, role } = req.body;
+
+  try {
+    // Check existing
+    const existing = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    if (existing.rows.length > 0)
+      return res.status(400).json({ message: 'User already exists' });
+
+    // Map role name to ID
+    const roleMap = {
+      'Admin': 1,
+      'Committee Member': 2,
+      'Researcher': 3,
+      'Faculty': 4
+    };
+    const role_id = roleMap[role] || 3; // Default to Researcher
+
+    // Split name
+    const parts = name.trim().split(' ');
+    const firstName = parts[0];
+    const lastName = parts.length > 1 ? parts.slice(1).join(' ') : '';
+
+    // Default password
+    const hashedPassword = await bcrypt.hash('password123', 10);
+
+    const result = await pool.query(
+      `INSERT INTO users (name, surname, email, password, role_id)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, surname, email, role_id, created_at`,
+      [firstName, lastName, email, hashedPassword, role_id]
+    );
+
+    res.status(201).json({
+      message: 'User created successfully',
+      user: {
+        ...result.rows[0],
+        role_name: role // Return role name for frontend convenience
+      }
+    });
+
+  } catch (err) {
+    console.error('Create user error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+/**
+ * DELETE USER (Admin Dashboard)
+ */
+router.delete('/users/:id', verifyToken, isSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await pool.query('DELETE FROM users WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User deleted successfully' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;

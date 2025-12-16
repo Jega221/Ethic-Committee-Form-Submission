@@ -12,6 +12,8 @@ import UploadedFiles from "./pages/UploadedFiles";
 import StudyStatus from "./pages/StudyStatus";
 import Agenda from "./pages/Agenda";
 import Settings from "./pages/Settings";
+import AdminDashboard from "./pages/AdminDashboard";
+import ReviewOversight from "./pages/ReviewOversight";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,7 +34,13 @@ const App = () => (
           <Route path="/study-status" element={<StudyStatus />} />
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/settings" element={<Settings />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+
+          {/* FIX HERE */}
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+
+          <Route path="/admin/review-oversight" element={<ReviewOversight />} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

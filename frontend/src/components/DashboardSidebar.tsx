@@ -37,12 +37,7 @@ export function DashboardSidebar() {
   return (
     <Sidebar className="border-r border-border">
       <SidebarHeader className="p-4 pb-6">
-        <div className="flex items-center justify-between mb-6">
-          <img
-            src={fiuLogo}
-            alt="Final International University Logo"
-            className="h-40 w-auto object-contain mx-auto"
-          />
+        <div className="flex justify-end mb-2">
           <button
             onClick={toggleSidebar}
             className="p-2 hover:bg-accent rounded-lg transition-colors"
@@ -50,6 +45,14 @@ export function DashboardSidebar() {
             <X className="w-5 h-5" />
           </button>
         </div>
+        <div className="flex justify-center mb-6">
+          <img
+            src={fiuLogo}
+            alt="Final International University Logo"
+            className="h-28 w-auto object-contain"
+          />
+        </div>
+
 
         <Separator className="mb-6" />
 
