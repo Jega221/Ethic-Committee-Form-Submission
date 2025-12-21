@@ -36,6 +36,7 @@ router.get('/researcher/:id', async (req, res) => {
         a.description,
         a.status,
         a.submission_date,
+        p.current_step,
         (
           SELECT json_agg(json_build_object(
             'document_id', d.document_id,
@@ -47,6 +48,7 @@ router.get('/researcher/:id', async (req, res) => {
           WHERE d.application_id = a.application_id
         ) AS documents
       FROM application a
+      LEFT JOIN process p ON a.application_id = p.application_id
       WHERE a.researcher_id = $1
       ORDER BY a.submission_date DESC`,
       [id]

@@ -21,7 +21,8 @@ interface SubmittedApplication {
   id: string;
   title?: string;
   submissionDate: string;
-  status: string;
+  status: string; // The application status (e.g. Pending, Approved)
+  currentStep?: string; // The workflow step (e.g. supervisor, faculty)
   documents?: { type: string; fileName: string }[];
   applicantName?: string;
   email?: string;
@@ -37,19 +38,18 @@ interface SubmittedApplication {
 }
 
 const statusSteps = [
-  { key: 'submitted', label: 'Submitted', color: 'bg-success' },
+  { key: 'supervisor', label: 'Supervisor Review', color: 'bg-success' },
   { key: 'faculty', label: 'Faculty Review', color: 'bg-info' },
   { key: 'committee', label: 'Committee Review', color: 'bg-warning' },
-  { key: 'dean', label: 'Dean Decision', color: 'bg-primary' },
+  { key: 'rectorate', label: 'Rectorate Decision', color: 'bg-primary' },
 ];
 
-const getStatusIndex = (status: string): number => {
-  const s = status.toLowerCase();
-  if (s.includes('faculty')) return 1;
-  if (s.includes('committee') || s.includes('ethics')) return 2;
-  if (s.includes('dean')) return 3;
-  if (s.includes('approved') || s.includes('final')) return 3; // clamp to final step index
-  return 0;
+const getStatusIndex = (step: string): number => {
+  const s = (step || '').toLowerCase();
+  if (s === 'done' || s === 'approved') return 3; // Finished
+
+  const index = statusSteps.findIndex(x => x.key === s);
+  return index >= 0 ? index : 0;
 };
 
 // Use percent progress based on steps length so it always matches UI
@@ -65,6 +65,14 @@ const getExpectedDecisionDate = (submissionDate?: string): string => {
   if (Number.isNaN(date.getTime())) return 'Invalid date';
   date.setDate(date.getDate() + 30);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+};
+
+const getStatusColor = (status: string) => {
+  const s = status.toLowerCase();
+  if (['approved', 'accepted'].some(k => s.includes(k))) return 'bg-success text-success-foreground';
+  if (['rejected', 'declined'].some(k => s.includes(k))) return 'bg-destructive text-destructive-foreground';
+  if (s.includes('pending') || s.includes('review') || s.includes('submitted')) return 'bg-amber-500 text-white'; // Amber for pending
+  return 'bg-secondary text-secondary-foreground';
 };
 
 export default function StudyStatus() {
@@ -88,6 +96,7 @@ export default function StudyStatus() {
             id: String(app.application_id), // Use backend ID
             title: app.title,
             status: app.status, // e.g. "Pending", "Faculty Review"
+            currentStep: app.current_step, // Map backend step
             submissionDate: new Date(app.submission_date).toLocaleDateString(),
             documents: (app.documents || []).map((doc: any) => ({
               type: doc.file_type || 'Document',
@@ -107,7 +116,7 @@ export default function StudyStatus() {
   }, []);
 
   const latestApplication = applications.length > 0 ? applications[applications.length - 1] : null;
-  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.status || '') : 0;
+  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.currentStep || '') : 0;
   const progressPercent = calcProgressPercent(currentStatusIndex);
 
   // Get user profile for additional info (safe parse)
@@ -206,7 +215,7 @@ export default function StudyStatus() {
 
                 {/* Status Badge */}
                 <div className="flex justify-center mb-6">
-                  <span className="px-6 py-2.5 bg-destructive text-destructive-foreground rounded-full text-sm font-semibold shadow-md">
+                  <span className={`px-6 py-2.5 rounded-full text-sm font-semibold shadow-md ${getStatusColor(latestApplication.status)}`}>
                     {latestApplication.status}
                   </span>
                 </div>
@@ -325,7 +334,7 @@ export default function StudyStatus() {
                             <p className="text-xs text-muted-foreground uppercase">Reference Number</p>
                             <p className="text-lg font-mono font-semibold text-foreground">{latestApplication.id}</p>
                           </div>
-                          <span className="px-4 py-1.5 bg-destructive text-destructive-foreground rounded-full text-sm font-medium">
+                          <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${getStatusColor(latestApplication.status)}`}>
                             {latestApplication.status}
                           </span>
                         </div>

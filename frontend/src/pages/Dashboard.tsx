@@ -6,6 +6,21 @@ import { DashboardSidebar } from '@/components/DashboardSidebar';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [userName, setUserName] = React.useState("Researcher");
+
+  React.useEffect(() => {
+    const userProfile = localStorage.getItem("userProfile");
+    if (userProfile) {
+      try {
+        const user = JSON.parse(userProfile);
+        if (user.name) {
+          setUserName(user.name);
+        }
+      } catch (e) {
+        console.error("Failed to parse user profile", e);
+      }
+    }
+  }, []);
 
   const handleStartApplication = () => {
     navigate('/new-application');
@@ -15,7 +30,7 @@ const Dashboard = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-secondary/30">
         <DashboardSidebar />
-        
+
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="bg-card border-b border-border px-4 py-4">
@@ -26,7 +41,7 @@ const Dashboard = () => {
                   Final International University Ethic committee
                 </h1>
               </div>
-              
+
               <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
                 <Bell className="w-6 h-6 text-foreground" />
                 <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -40,13 +55,13 @@ const Dashboard = () => {
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
             <div className="bg-card rounded-lg shadow-sm border border-border p-8">
               <h2 className="text-2xl font-semibold text-foreground mb-4">
-                Welcome, Researcher
+                Welcome, {userName}
               </h2>
               <p className="text-base text-muted-foreground mb-8">
                 Submit and track your research ethics applications.
               </p>
-              
-              <button 
+
+              <button
                 onClick={handleStartApplication}
                 className="bg-destructive text-destructive-foreground text-base font-medium px-6 py-3 rounded-lg hover:bg-destructive/90 transition-colors"
               >

@@ -66,6 +66,14 @@ const UploadedFiles = () => {
     console.log('Downloading:', fileName);
   };
 
+  const getStatusColor = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (['approved', 'accepted'].some(k => s.includes(k))) return 'bg-success text-success-foreground border-success';
+    if (['rejected', 'declined'].some(k => s.includes(k))) return 'bg-destructive text-destructive-foreground border-destructive';
+    if (s.includes('pending') || s.includes('review') || s.includes('submitted')) return 'bg-amber-500 text-white border-amber-500'; // Amber for pending
+    return 'bg-secondary text-secondary-foreground border-secondary';
+  };
+
   if (loading) {
     return <Loader fullScreen />;
   }
@@ -126,7 +134,7 @@ const UploadedFiles = () => {
                       </div>
                       <Badge
                         variant="outline"
-                        className="bg-amber-50 text-amber-600 border-amber-200 whitespace-nowrap self-start"
+                        className={`whitespace-nowrap self-start ${getStatusColor(application.status)}`}
                       >
                         {application.status}
                       </Badge>

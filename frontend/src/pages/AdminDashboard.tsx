@@ -316,9 +316,7 @@ export default function AdminDashboard() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <Button onClick={handleAddUser} className="w-full">
-                        Add User
-                      </Button>
+
                     </div>
                   </DialogContent>
                 </Dialog>
