@@ -14,6 +14,8 @@ import Agenda from "./pages/Agenda";
 import Settings from "./pages/Settings";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReviewOversight from "./pages/ReviewOversight";
+import Faculty from "./pages/Faculty";
+import Committee from "./pages/Committee";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -34,13 +36,15 @@ const App = () => (
           <Route path="/study-status" element={<StudyStatus />} />
           <Route path="/agenda" element={<Agenda />} />
           <Route path="/settings" element={<Settings />} />
-
-          {/* FIX HERE */}
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
           <Route path="/admin/review-oversight" element={<ReviewOversight />} />
 
+          <Route path="/faculty" element={<Faculty />} />
+          <Route path="/committee" element={<Committee />} />
+
+          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

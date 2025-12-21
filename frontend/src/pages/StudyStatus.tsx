@@ -1,5 +1,3 @@
-'use client';
-
 import { CheckCircle, FileText, Download, Calendar, MessageSquare, Eye, User, BookOpen, Users, Shield } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
@@ -19,7 +17,7 @@ import { Loader } from '@/components/ui/loader';
 
 interface SubmittedApplication {
   id: string;
-  title?: string;
+  title: string;
   submissionDate: string;
   status: string; // The application status (e.g. Pending, Approved)
   currentStep?: string; // The workflow step (e.g. supervisor, faculty)
@@ -52,17 +50,14 @@ const getStatusIndex = (step: string): number => {
   return index >= 0 ? index : 0;
 };
 
-// Use percent progress based on steps length so it always matches UI
 const calcProgressPercent = (index: number) => {
   const maxIndex = Math.max(statusSteps.length - 1, 1);
   const clamped = Math.max(0, Math.min(index, maxIndex));
   return (clamped / maxIndex) * 100;
 };
 
-const getExpectedDecisionDate = (submissionDate?: string): string => {
-  if (!submissionDate) return 'Not specified';
+const getExpectedDecisionDate = (submissionDate: string): string => {
   const date = new Date(submissionDate);
-  if (Number.isNaN(date.getTime())) return 'Invalid date';
   date.setDate(date.getDate() + 30);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
@@ -119,13 +114,8 @@ export default function StudyStatus() {
   const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.currentStep || '') : 0;
   const progressPercent = calcProgressPercent(currentStatusIndex);
 
-  // Get user profile for additional info (safe parse)
-  let userProfile: Record<string, any> = {};
-  try {
-    userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}') || {};
-  } catch {
-    userProfile = {};
-  }
+  // Get user profile for additional info
+  const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
 
   if (loading) {
     return (
@@ -189,7 +179,7 @@ export default function StudyStatus() {
                       Uploaded Documents
                     </h2>
                     <div className="space-y-3">
-                      {(latestApplication.documents && latestApplication.documents.length > 0) ? (
+                      {latestApplication.documents && latestApplication.documents.length > 0 ? (
                         latestApplication.documents.map((doc, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-3">
@@ -235,13 +225,12 @@ export default function StudyStatus() {
                       {statusSteps.map((step, index) => (
                         <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
                           <div
-                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 $ {
-                              index < currentStatusIndex
+                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${index < currentStatusIndex
                                 ? 'bg-success border-success text-success-foreground'
                                 : index === currentStatusIndex
-                                ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
-                                : 'bg-muted border-muted-foreground/30 text-muted-foreground'
-                            }`}
+                                  ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
+                                  : 'bg-muted border-muted-foreground/30 text-muted-foreground'
+                              }`}
                           >
                             {index < currentStatusIndex ? (
                               <CheckCircle className="w-5 h-5" />
@@ -452,7 +441,7 @@ export default function StudyStatus() {
                             Uploaded Documents
                           </h3>
                           <div className="space-y-2">
-                            {(latestApplication.documents && latestApplication.documents.length > 0) ? (
+                            {latestApplication.documents && latestApplication.documents.length > 0 ? (
                               latestApplication.documents.map((doc, index) => (
                                 <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                                   <div className="flex items-center gap-3">
