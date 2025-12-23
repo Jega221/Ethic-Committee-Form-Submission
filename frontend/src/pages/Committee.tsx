@@ -1,6 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { FacultySidebar } from "@/components/FacultySidebar";
+import { getAllApplications, processApplication, updateApplicationStatus, API_BASE_URL } from "@/lib/api";
+import { Loader } from "@/components/ui/loader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Table,
   TableBody,
@@ -9,8 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,134 +21,91 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Check, X, RotateCcw, FileText, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { FileText, Check, RotateCcw, X, Download, Eye } from "lucide-react";
 
 const committeeMembers = [
-  {
-    name: "Dr. Sarah Mitchell",
-    role: "Chair",
-    expertise: "Medical Ethics & Bioethics",
-  },
-  {
-    name: "Dr. James Chen",
-    role: "Vice Chair",
-    expertise: "Clinical Research & Oncology",
-  },
-  {
-    name: "Prof. Maria Rodriguez",
-    role: "Member",
-    expertise: "Psychology & Mental Health",
-  },
-  {
-    name: "Dr. Robert Thompson",
-    role: "Member",
-    expertise: "Legal & Regulatory Affairs",
-  },
-  {
-    name: "Dr. Aisha Patel",
-    role: "Member",
-    expertise: "Community Health & Patient Advocacy",
-  },
-  {
-    name: "Dr. Michael O'Brien",
-    role: "Member",
-    expertise: "Pharmacology & Clinical Trials",
-  },
+  { name: "Dr. Jane Smith", role: "Chair", expertise: "Ethics & Bioethics" },
+  { name: "Dr. Robert Wilson", role: "Reviewer", expertise: "Research Methodology" },
+  { name: "Prof. Sarah Chen", role: "Reviewer", expertise: "Data Privacy" },
+  { name: "David Thompson", role: "Lay Member", expertise: "Community Representation" },
 ];
 
 interface DecisionItem {
   id: string;
   title: string;
   status: string;
+  currentStep?: string;
   date: string;
-  documents: { type: string; fileName: string }[];
+  documents: { type: string; fileName: string; url: string }[];
+  applicantName?: string;
+  facultyName?: string;
 }
 
-const initialDecisionTracking: DecisionItem[] = [
-  {
-    id: "ETH-2024-001",
-    title: "Impact of AI-Assisted Diagnosis on Patient Outcomes",
-    status: "Pending",
-    date: "Dec 10, 2024",
-    documents: [
-      { type: "Informed Consent Form", fileName: "consent_form.pdf" },
-      { type: "Research Protocol", fileName: "protocol_v1.pdf" },
-    ],
-  },
-  {
-    id: "ETH-2024-002",
-    title: "Gene Therapy for Rare Genetic Disorders",
-    status: "Pending",
-    date: "Dec 8, 2024",
-    documents: [
-      { type: "Informed Consent Form", fileName: "gene_consent.pdf" },
-      { type: "Research Protocol", fileName: "gene_protocol.pdf" },
-      { type: "Data Collection Instruments", fileName: "instruments.pdf" },
-    ],
-  },
-  {
-    id: "ETH-2024-003",
-    title: "Mental Health Intervention in Adolescents",
-    status: "Approved",
-    date: "Dec 5, 2024",
-    documents: [
-      { type: "Research Protocol", fileName: "mental_health_protocol.pdf" },
-    ],
-  },
-  {
-    id: "ETH-2024-004",
-    title: "Experimental Drug Trial for Advanced Cancer",
-    status: "Pending",
-    date: "Dec 3, 2024",
-    documents: [
-      { type: "Informed Consent Form", fileName: "drug_consent.pdf" },
-      { type: "Research Protocol", fileName: "drug_protocol.pdf" },
-    ],
-  },
-  {
-    id: "ETH-2024-005",
-    title: "Unregulated Data Collection from Minors",
-    status: "Rejected",
-    date: "Nov 28, 2024",
-    documents: [
-      { type: "Research Protocol", fileName: "data_protocol.pdf" },
-    ],
-  },
-  {
-    id: "ETH-2024-006",
-    title: "Cognitive Enhancement Study in Healthy Adults",
-    status: "Approved",
-    date: "Nov 25, 2024",
-    documents: [
-      { type: "Informed Consent Form", fileName: "cognitive_consent.pdf" },
-      { type: "Research Protocol", fileName: "cognitive_protocol.pdf" },
-    ],
-  },
-];
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case "Approved":
-      return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">{status}</Badge>;
-    case "Revision Required":
-      return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">{status}</Badge>;
-    case "Rejected":
-      return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">{status}</Badge>;
-    case "Pending":
-      return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">{status}</Badge>;
-    default:
-      return <Badge variant="secondary">{status}</Badge>;
+const getStatusBadge = (status: string, step?: string) => {
+  const s = (status || '').toLowerCase();
+  if (s === 'approved' || s === 'accepted') {
+    return <Badge className="bg-green-100 text-green-700 hover:bg-green-100">Approved</Badge>;
   }
+  if (s === 'rejected' || s === 'declined') {
+    return <Badge className="bg-red-100 text-red-700 hover:bg-red-100">Rejected</Badge>;
+  }
+  if (s.includes('revision')) {
+    return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-100">Revision Required</Badge>;
+  }
+
+  return (
+    <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-100">
+      {step ? (step.charAt(0).toUpperCase() + step.slice(1)) : 'Pending'}
+    </Badge>
+  );
 };
 
 const Committee = () => {
   const { toast } = useToast();
-  const [decisions, setDecisions] = useState<DecisionItem[]>(initialDecisionTracking);
+  const [decisions, setDecisions] = useState<DecisionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<DecisionItem | null>(null);
   const [actionType, setActionType] = useState<"approve" | "reject" | "revision" | null>(null);
   const [comment, setComment] = useState("");
   const [viewFilesItem, setViewFilesItem] = useState<DecisionItem | null>(null);
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const res = await getAllApplications();
+
+      const mapped: DecisionItem[] = res.data.map((app: any) => ({
+        id: String(app.application_id),
+        title: app.title,
+        status: app.status,
+        currentStep: app.current_step,
+        date: new Date(app.submission_date).toLocaleDateString(),
+        applicantName: `${app.researcher_name} ${app.researcher_surname}`,
+        facultyName: app.faculty_name,
+        documents: (app.documents || []).map((doc: any) => ({
+          type: doc.file_type || 'Document',
+          fileName: doc.file_name,
+          url: doc.file_url
+        }))
+      }));
+
+      setDecisions(mapped);
+    } catch (error) {
+      console.error("Error fetching committee applications:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch applications.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApplications();
+  }, []);
 
   const handleAction = (item: DecisionItem, action: "approve" | "reject" | "revision") => {
     setSelectedItem(item);
@@ -154,26 +113,57 @@ const Committee = () => {
     setComment("");
   };
 
-  const confirmAction = () => {
+  const confirmAction = async () => {
     if (!selectedItem || !actionType) return;
 
-    const newStatus = actionType === "approve" ? "Approved" : actionType === "reject" ? "Rejected" : "Revision Required";
-    
-    setDecisions(prev =>
-      prev.map(d =>
-        d.id === selectedItem.id ? { ...d, status: newStatus } : d
-      )
-    );
+    try {
+      if (actionType === 'revision') {
+        // For Revisions, use the updateApplicationStatus endpoint to save comments
+        await updateApplicationStatus(selectedItem.id, {
+          status: 'Revision Requested',
+          comment: comment
+        });
+      } else {
+        // For Approve/Reject, use the processApplication endpoint to advance workflow
+        await processApplication(selectedItem.id, actionType);
+      }
 
-    toast({
-      title: `Application ${newStatus}`,
-      description: `${selectedItem.id} has been ${newStatus.toLowerCase()}.`,
-    });
+      toast({
+        title: "Success",
+        description: `Application ${selectedItem.id} has been processed.`,
+      });
 
-    setSelectedItem(null);
-    setActionType(null);
-    setComment("");
+      // Refresh list
+      fetchApplications();
+    } catch (error: any) {
+      console.error("Error processing application:", error);
+      toast({
+        title: "Error",
+        description: error.response?.data?.message || error.message || "Failed to process application.",
+        variant: "destructive",
+      });
+    } finally {
+      setSelectedItem(null);
+      setActionType(null);
+      setComment("");
+    }
   };
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="min-h-screen flex w-full bg-background items-center justify-center">
+          <Loader />
+        </div>
+      </SidebarProvider>
+    );
+  }
+
+  const pendingDecisions = decisions.filter(d => {
+    const step = (d.currentStep || '').toLowerCase();
+    const status = (d.status || '').toLowerCase();
+    return step === 'committee' && status !== 'approved' && status !== 'rejected';
+  });
 
   return (
     <SidebarProvider>
@@ -216,62 +206,65 @@ const Committee = () => {
             <div>
               <h2 className="text-xs font-medium text-muted-foreground tracking-wide mb-4">DECISION TRACKING</h2>
               <div className="space-y-3">
-                {decisions.map((item) => (
-                  <div key={item.id} className="bg-card rounded-lg border p-4">
-                    <div className="flex items-center justify-between mb-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">{item.id}</span>
-                        {getStatusBadge(item.status)}
-                      </div>
-                      <span className="text-sm text-muted-foreground">{item.date}</span>
-                    </div>
-                    <p className="font-medium text-foreground mb-3">{item.title}</p>
-                    
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setViewFilesItem(item)}
-                        className="gap-1"
-                      >
-                        <FileText className="h-4 w-4" />
-                        View Files
-                      </Button>
-                      {item.status === "Pending" && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAction(item, "approve")}
-                            className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
-                          >
-                            <Check className="h-4 w-4" />
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAction(item, "revision")}
-                            className="gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                          >
-                            <RotateCcw className="h-4 w-4" />
-                            Request Revision
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleAction(item, "reject")}
-                            className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            <X className="h-4 w-4" />
-                            Reject
-                          </Button>
-                        </>
-                      )}
-                    </div>
+                {pendingDecisions.length === 0 ? (
+                  <div className="bg-card rounded-lg border p-8 text-center text-muted-foreground">
+                    No applications pending Committee Review.
                   </div>
-                ))}
+                ) : (
+                  pendingDecisions.map((item) => (
+                    <div key={item.id} className="bg-card rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">APP-{item.id}</span>
+                          {getStatusBadge(item.status, item.currentStep)}
+                        </div>
+                        <span className="text-sm text-muted-foreground">{item.date}</span>
+                      </div>
+                      <p className="font-medium text-foreground mb-1">{item.title}</p>
+                      <p className="text-sm text-muted-foreground mb-3">{item.applicantName} • {item.facultyName}</p>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setViewFilesItem(item)}
+                          className="gap-1"
+                        >
+                          <FileText className="h-4 w-4" />
+                          View Files
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAction(item, "approve")}
+                          className="gap-1 text-green-600 hover:text-green-700 hover:bg-green-50"
+                        >
+                          <Check className="h-4 w-4" />
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAction(item, "revision")}
+                          className="gap-1 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                          Request Revision
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleAction(item, "reject")}
+                          className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <X className="h-4 w-4" />
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -307,8 +300,8 @@ const Committee = () => {
               onClick={confirmAction}
               className={
                 actionType === "approve" ? "bg-green-600 hover:bg-green-700" :
-                actionType === "reject" ? "bg-red-600 hover:bg-red-700" :
-                "bg-orange-600 hover:bg-orange-700"
+                  actionType === "reject" ? "bg-red-600 hover:bg-red-700" :
+                    "bg-orange-600 hover:bg-orange-700"
               }
             >
               Confirm
@@ -334,9 +327,24 @@ const Committee = () => {
                     <p className="text-xs text-muted-foreground">{doc.fileName}</p>
                   </div>
                 </div>
-                <Button size="sm" variant="ghost">
-                  <Download className="h-4 w-4" />
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                    title="View document"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                    title="Download document"
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>

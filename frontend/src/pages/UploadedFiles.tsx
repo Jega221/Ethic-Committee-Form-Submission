@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { Bell, FileText, Download } from 'lucide-react';
+import { Bell, FileText, Download, Eye } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,7 @@ import { Loader } from '@/components/ui/loader';
 interface Document {
   type: string;
   fileName: string;
+  url: string;
 }
 
 interface Application {
@@ -33,7 +34,7 @@ const UploadedFiles = () => {
         const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
         if (userProfile.id) {
           // Import dynamically or at top-level. 
-          const { getResearcherApplications } = await import('@/lib/api');
+          const { getResearcherApplications, API_BASE_URL } = await import('@/lib/api');
           const res = await getResearcherApplications(userProfile.id);
 
           // Map API response to UI model
@@ -46,7 +47,8 @@ const UploadedFiles = () => {
             // Handle case where documents might be null from LEFT JOIN/json_agg
             documents: (app.documents || []).map((doc: any) => ({
               type: doc.file_type || 'Document',
-              fileName: doc.file_name || 'Unknown'
+              fileName: doc.file_name || 'Unknown',
+              url: doc.file_url
             })).filter((d: any) => d.fileName)
           }));
 
@@ -61,9 +63,13 @@ const UploadedFiles = () => {
     fetchApplications();
   }, []);
 
-  const handleDownload = (fileName: string) => {
-    // In a real app, this would download the file
-    console.log('Downloading:', fileName);
+  const handleDownload = async (url: string) => {
+    try {
+      const { API_BASE_URL } = await import('@/lib/api');
+      window.open(`${API_BASE_URL}/${url}`, '_blank');
+    } catch (err) {
+      console.error("Download error:", err);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -162,12 +168,22 @@ const UploadedFiles = () => {
                                 </p>
                               </div>
                             </div>
-                            <button
-                              onClick={() => handleDownload(doc.fileName)}
-                              className="text-primary hover:text-primary/80 text-sm font-medium transition-colors"
-                            >
-                              Download
-                            </button>
+                            <div className="flex gap-4">
+                              <button
+                                onClick={() => handleDownload(doc.url)}
+                                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
+                              >
+                                <Eye className="w-4 h-4" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => handleDownload(doc.url)}
+                                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
+                              >
+                                <Download className="w-4 h-4" />
+                                Download
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>

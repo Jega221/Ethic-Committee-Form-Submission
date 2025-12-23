@@ -1,7 +1,7 @@
 import { CheckCircle, FileText, Download, Calendar, MessageSquare, Eye, User, BookOpen, Users, Shield } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
-import { getResearcherApplications } from '@/lib/api';
+import { getResearcherApplications, API_BASE_URL } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -21,7 +21,7 @@ interface SubmittedApplication {
   submissionDate: string;
   status: string; // The application status (e.g. Pending, Approved)
   currentStep?: string; // The workflow step (e.g. supervisor, faculty)
-  documents?: { type: string; fileName: string }[];
+  documents?: { type: string; fileName: string; url: string }[];
   applicantName?: string;
   email?: string;
   faculty?: string;
@@ -80,13 +80,16 @@ export default function StudyStatus() {
   useEffect(() => {
     const fetchApplications = async () => {
       try {
-        const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
-        if (userProfile.id) {
-          // Import dynamically or at top-level. Assuming getResearcherApplications is imported
+        const profileStr = localStorage.getItem('userProfile');
+        if (!profileStr) {
+          console.warn("No userProfile found in localStorage");
+          setLoading(false);
+          return;
+        }
+        const userProfile = JSON.parse(profileStr);
+        if (userProfile && userProfile.id) {
           const res = await getResearcherApplications(userProfile.id);
           // Map API response to UI model if needed. 
-          // Assuming API returns array of applications which mostly match our interface.
-          // We might need to transform `application_id` to `id`, etc.
           const mappedApps = res.data.map((app: any) => ({
             id: String(app.application_id), // Use backend ID
             title: app.title,
@@ -95,11 +98,14 @@ export default function StudyStatus() {
             submissionDate: new Date(app.submission_date).toLocaleDateString(),
             documents: (app.documents || []).map((doc: any) => ({
               type: doc.file_type || 'Document',
-              fileName: doc.file_name || 'Unknown'
+              fileName: doc.file_name || 'Unknown',
+              url: doc.file_url
             })).filter((d: any) => d.fileName)
           }));
 
           setApplications(mappedApps);
+        } else {
+          console.error("User ID not found in userProfile", userProfile);
         }
       } catch (err) {
         console.error(err);
@@ -191,9 +197,26 @@ export default function StudyStatus() {
                                 <p className="text-muted-foreground text-xs">{doc.type}</p>
                               </div>
                             </div>
-                            <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                              <Download className="w-4 h-4" />
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-primary hover:text-primary/80"
+                                onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                title="View document"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-primary hover:text-primary/80"
+                                onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                title="Download document"
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </div>
                         ))
                       ) : (
@@ -226,10 +249,10 @@ export default function StudyStatus() {
                         <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
                           <div
                             className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${index < currentStatusIndex
-                                ? 'bg-success border-success text-success-foreground'
-                                : index === currentStatusIndex
-                                  ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
-                                  : 'bg-muted border-muted-foreground/30 text-muted-foreground'
+                              ? 'bg-success border-success text-success-foreground'
+                              : index === currentStatusIndex
+                                ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
+                                : 'bg-muted border-muted-foreground/30 text-muted-foreground'
                               }`}
                           >
                             {index < currentStatusIndex ? (
@@ -451,9 +474,26 @@ export default function StudyStatus() {
                                       <p className="text-muted-foreground text-xs">{doc.type}</p>
                                     </div>
                                   </div>
-                                  <Button variant="ghost" size="sm" className="text-primary">
-                                    <Download className="w-4 h-4" />
-                                  </Button>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-primary"
+                                      onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                      title="View document"
+                                    >
+                                      <Eye className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-primary"
+                                      onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                      title="Download document"
+                                    >
+                                      <Download className="w-4 h-4" />
+                                    </Button>
+                                  </div>
                                 </div>
                               ))
                             ) : (

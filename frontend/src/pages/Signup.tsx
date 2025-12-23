@@ -32,7 +32,7 @@ const Signup = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validate passwords match
     if (password !== confirmPassword) {
       toast({
@@ -67,7 +67,7 @@ const Signup = () => {
 
       // Store token
       localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      localStorage.setItem("userProfile", JSON.stringify(data.user));
 
       toast({
         title: "Success",
@@ -137,7 +137,7 @@ const Signup = () => {
                   className="h-11"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="surname" className="text-sm font-medium text-foreground">
                   Surname
@@ -173,7 +173,7 @@ const Signup = () => {
                 </SelectContent>
               </Select>
             </div>
-            
+
             {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-sm font-medium text-foreground">
@@ -189,7 +189,7 @@ const Signup = () => {
                 className="h-11"
               />
             </div>
-            
+
             {/* Password Fields */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -15,7 +15,7 @@ export const ReviewProcess: React.FC = () => {
       <div className="text-center mb-8">
         <h2 className="text-foreground text-lg font-medium">Review Process</h2>
       </div>
-      <div 
+      <div
         className="flex items-start justify-center flex-wrap gap-y-6 px-4"
         role="list"
         aria-label="Ethics review process steps"

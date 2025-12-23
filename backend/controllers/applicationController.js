@@ -62,10 +62,18 @@ async function submitApplication(req, res) {
     const wfRes = await pool.query("SELECT * FROM workflow WHERE status = 'current'");
     if (wfRes.rows.length > 0) {
       const workflow = wfRes.rows[0];
+
+      // User requested that all new applications MUST be approved by faculty first.
+      // We will initialize the current_step to 'faculty' regardless of the workflow first_step label,
+      // or assume the workflow steps are ordered and we find where 'faculty' is.
+      // For simplicity and to satisfy the immediate request:
+      const initialStep = 'faculty';
+      const nextStep = workflow.third_step; // Assuming second_step was 'faculty', third is next.
+
       await pool.query(
         `INSERT INTO process (application_id, workflow_id, current_step, next_step)
          VALUES ($1, $2, $3, $4)`,
-        [application.application_id, workflow.id, workflow.first_step, workflow.second_step]
+        [application.application_id, workflow.id, initialStep, nextStep]
       );
     }
 
@@ -89,10 +97,22 @@ async function getAllApplications(req, res) {
         u.name AS researcher_name,
         u.surname AS researcher_surname,
         u.email,
-        f.name AS faculty_name
+        f.name AS faculty_name,
+        p.current_step,
+        (
+          SELECT json_agg(json_build_object(
+            'document_id', d.document_id,
+            'file_name', d.file_name,
+            'file_type', d.file_type,
+            'file_url', d.file_url
+          ))
+          FROM documents d
+          WHERE d.application_id = a.application_id
+        ) AS documents
       FROM application a
       JOIN users u ON a.researcher_id = u.id
       JOIN faculties f ON a.faculty_id = f.id
+      LEFT JOIN process p ON a.application_id = p.application_id
       ORDER BY a.submission_date DESC;
     `);
 

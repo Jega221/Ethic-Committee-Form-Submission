@@ -28,6 +28,12 @@ router.get('/', getAllApplications);
 // Get applications by researcher ID
 router.get('/researcher/:id', async (req, res) => {
   const { id } = req.params;
+  const researcherId = parseInt(id, 10);
+
+  if (isNaN(researcherId)) {
+    return res.status(400).json({ error: 'Invalid researcher ID' });
+  }
+
   try {
     const result = await pool.query(
       `SELECT 
@@ -51,7 +57,7 @@ router.get('/researcher/:id', async (req, res) => {
       LEFT JOIN process p ON a.application_id = p.application_id
       WHERE a.researcher_id = $1
       ORDER BY a.submission_date DESC`,
-      [id]
+      [researcherId]
     );
     res.json(result.rows);
   } catch (error) {

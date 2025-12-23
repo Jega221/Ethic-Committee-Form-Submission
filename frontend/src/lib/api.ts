@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // 1) Read the base URL from Vite env
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:3000";
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string) || "http://localhost:3000";
 
 // Optional sanity check
 if (!API_BASE_URL) {
@@ -86,4 +86,19 @@ export async function createApplication(payload: FormData) {
 // 7) Get researcher applications
 export async function getResearcherApplications(userId: string | number) {
   return api.get(`/api/applications/researcher/${userId}`);
+}
+
+// 8) Get all applications (for Faculty/Committee)
+export async function getAllApplications() {
+  return api.get('/api/applications');
+}
+
+// 9) Process Application (Approve/Reject)
+export async function processApplication(applicationId: string | number, action: string) {
+  return api.post('/api/process', { application_id: String(applicationId), action });
+}
+
+// 10) Update Application Status (Approve/Reject/Revision with comments)
+export async function updateApplicationStatus(applicationId: string | number, payload: { status: string, comment?: string, committee_id?: number }) {
+  return api.patch(`/api/applications/${applicationId}/status`, payload);
 }

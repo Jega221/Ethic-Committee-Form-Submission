@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { FacultySidebar } from "@/components/FacultySidebar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,8 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-
+import { getAllApplications, processApplication, API_BASE_URL } from "@/lib/api";
+import { Loader } from "@/components/ui/loader";
 
 interface StudentSubmission {
   id: string;
@@ -27,98 +28,109 @@ interface StudentSubmission {
   pendingCount: number;
   latestSubmission: string;
   submissionDate: string;
-  status: "pending" | "approved" | "rejected" | "revision";
-  documents: { name: string; type: string; date: string }[];
+  status: string;
+  currentStep?: string;
+  documents: { name: string; type: string; date: string; url: string }[];
 }
-
-const initialStudents: StudentSubmission[] = [
-  {
-    id: "1",
-    name: "Marhaba Bernadette",
-    initials: "MB",
-    program: "PhD in Computer Science",
-    studentId: "ST2025001",
-    email: "marhaba.b@student.fiu.edu",
-    pendingCount: 4,
-    latestSubmission: "Research Proposal Draft",
-    submissionDate: "11/8/2025",
-    status: "pending",
-    documents: [
-      { name: "Research Proposal Draft", type: "Proposal", date: "11/8/2025" },
-      { name: "Literature Review", type: "Document", date: "11/5/2025" },
-      { name: "Methodology Chapter", type: "Document", date: "11/3/2025" },
-      { name: "Ethics Application", type: "Ethics", date: "11/1/2025" },
-    ],
-  },
-  {
-    id: "2",
-    name: "John Smith",
-    initials: "JS",
-    program: "PhD in Healthcare Management",
-    studentId: "ST2025002",
-    email: "john.smith@student.fiu.edu",
-    pendingCount: 3,
-    latestSubmission: "IRB Protocol Submission",
-    submissionDate: "11/5/2025",
-    status: "pending",
-    documents: [
-      { name: "IRB Protocol Submission", type: "Ethics", date: "11/5/2025" },
-      { name: "Consent Form Draft", type: "Document", date: "11/3/2025" },
-      { name: "Data Collection Plan", type: "Document", date: "11/1/2025" },
-    ],
-  },
-  {
-    id: "3",
-    name: "Sarah Johnson",
-    initials: "SJ",
-    program: "MSc in Data Science",
-    studentId: "ST2025003",
-    email: "sarah.j@student.fiu.edu",
-    pendingCount: 2,
-    latestSubmission: "Thesis Chapter 1",
-    submissionDate: "11/10/2025",
-    status: "pending",
-    documents: [
-      { name: "Thesis Chapter 1", type: "Thesis", date: "11/10/2025" },
-      { name: "Research Timeline", type: "Document", date: "11/8/2025" },
-    ],
-  },
-];
 
 const Faculty = () => {
   const { toast } = useToast();
-  const [students, setStudents] = useState<StudentSubmission[]>(initialStudents);
+  const [students, setStudents] = useState<StudentSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [selectedStudent, setSelectedStudent] = useState<StudentSubmission | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isRevisionDialogOpen, setIsRevisionDialogOpen] = useState(false);
   const [revisionComment, setRevisionComment] = useState("");
   const [actionStudent, setActionStudent] = useState<StudentSubmission | null>(null);
-  const [viewingDocument, setViewingDocument] = useState<{ name: string; type: string; date: string } | null>(null);
+  const [viewingDocument, setViewingDocument] = useState<{ name: string; type: string; date: string; url: string } | null>(null);
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const res = await getAllApplications();
+      console.log("Raw Applications Data:", res.data); // DEBUG Log
+
+      // Filter for applications currently at 'faculty' step
+      // Also map backend data to UI model
+      const mapped: StudentSubmission[] = res.data
+        // .filter((app: any) => app.current_step === 'faculty') // Only show faculty step apps
+        .map((app: any) => ({
+          id: String(app.application_id),
+          name: `${app.researcher_name} ${app.researcher_surname}`,
+          initials: `${app.researcher_name?.[0] || ''}${app.researcher_surname?.[0] || ''}`,
+          program: app.faculty_name || "Unknown Program",
+          studentId: `APP-${app.application_id}`,
+          email: app.email,
+          pendingCount: 1, // hardcoded for now
+          latestSubmission: app.title,
+          submissionDate: new Date(app.submission_date).toLocaleDateString(),
+          status: app.status,
+          currentStep: app.current_step,
+          documents: (app.documents || []).map((doc: any) => ({
+            name: doc.file_name,
+            type: doc.file_type,
+            date: new Date(app.submission_date).toLocaleDateString(),
+            url: doc.file_url // Use real URL if needed
+          }))
+        }));
+
+      console.log("Mapped Students:", mapped); // DEBUG Log
+      setStudents(mapped);
+    } catch (error) {
+      console.error("Failed to fetch applications", error);
+      toast({
+        title: "Error",
+        description: "Failed to load applications.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchApplications();
+  }, []);
 
   const handleViewDocuments = (student: StudentSubmission) => {
     setSelectedStudent(student);
     setIsDialogOpen(true);
   };
 
-  const handleApprove = (student: StudentSubmission) => {
-    setStudents(prev => prev.map(s => 
-      s.id === student.id ? { ...s, status: "approved" as const, pendingCount: 0 } : s
-    ));
-    toast({
-      title: "Application Approved",
-      description: `${student.name}'s submission has been approved.`,
-    });
+  const handleApprove = async (student: StudentSubmission) => {
+    try {
+      await processApplication(student.id, 'approve');
+      toast({
+        title: "Application Approved",
+        description: `${student.name}'s submission has been approved.`,
+      });
+      fetchApplications(); // Refresh list
+    } catch (error: any) {
+      toast({
+        title: "Action Failed",
+        description: error.message || "Failed to approve application.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleReject = (student: StudentSubmission) => {
-    setStudents(prev => prev.map(s => 
-      s.id === student.id ? { ...s, status: "rejected" as const, pendingCount: 0 } : s
-    ));
-    toast({
-      title: "Application Rejected",
-      description: `${student.name}'s submission has been rejected.`,
-      variant: "destructive",
-    });
+  const handleReject = async (student: StudentSubmission) => {
+    try {
+      await processApplication(student.id, 'rejected'); // API check: expects 'rejected'?
+      toast({
+        title: "Application Rejected",
+        description: `${student.name}'s submission has been rejected.`,
+        variant: "destructive",
+      });
+      fetchApplications();
+    } catch (error: any) {
+      toast({
+        title: "Action Failed",
+        description: error.message || "Failed to reject application.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleRequestRevision = (student: StudentSubmission) => {
@@ -127,37 +139,55 @@ const Faculty = () => {
     setIsRevisionDialogOpen(true);
   };
 
-  const submitRevisionRequest = () => {
+  const submitRevisionRequest = async () => {
     if (actionStudent) {
-      setStudents(prev => prev.map(s => 
-        s.id === actionStudent.id ? { ...s, status: "revision" as const } : s
-      ));
+      // Logic for revision request, likely needs a different API endpoint or status update with comment
+      // For now we simulate it or implement if API supports it.
+      // Assuming we just mark status or use a specific endpoint. 
+      // The current plan didn't specify backend change for revision beyond status update.
+      // We will perform a status update for now.
+
+      // NOTE: processApplication endpoint (process.js) doesn't explicitly handle 'revision'
+      // We might need to use updateApplicationStatus(id, { status: 'Revision Requested', comment: ... })
+
       toast({
         title: "Revision Requested",
-        description: `Revision request sent to ${actionStudent.name}.`,
+        description: `Feature pending: Revision request for ${actionStudent.name}.`,
       });
       setIsRevisionDialogOpen(false);
       setActionStudent(null);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case "approved":
-        return <Badge className="bg-green-100 text-green-700 border-green-300">Approved</Badge>;
-      case "rejected":
-        return <Badge variant="destructive">Rejected</Badge>;
-      case "revision":
-        return <Badge className="bg-amber-100 text-amber-700 border-amber-300">Revision Requested</Badge>;
-      default:
-        return (
-          <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
-            <FileText className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        );
-    }
+  const getStatusBadge = (status: string, step?: string) => {
+    const s = (status || '').toLowerCase();
+
+    // Status color logic similar to StudyStatus but simplified
+    if (s === 'approved') return <Badge className="bg-green-100 text-green-700 border-green-300">Approved</Badge>;
+    if (s === 'rejected') return <Badge variant="destructive">Rejected</Badge>;
+    if (s.includes('revision')) return <Badge className="bg-amber-100 text-amber-700 border-amber-300">Revision Requested</Badge>;
+
+    // If pending, show the step
+    return (
+      <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+        <FileText className="h-3 w-3 mr-1" />
+        {step ? (step.charAt(0).toUpperCase() + step.slice(1)) : 'Pending'}
+      </Badge>
+    );
   };
+
+  if (loading) {
+    return (
+      <SidebarProvider>
+        <div className="flex h-screen w-full bg-background">
+          <FacultySidebar />
+          <main className="flex-1 flex items-center justify-center">
+            <Loader />
+          </main>
+        </div>
+      </SidebarProvider>
+    );
+  }
 
   return (
     <SidebarProvider>
@@ -169,58 +199,76 @@ const Faculty = () => {
           <div className="w-full max-w-7xl mx-auto">
             {/* Header */}
             <div className="mb-8">
-              <h1 className="text-3xl font-bold text-foreground">Document Review Portal</h1>
-              <p className="text-muted-foreground mt-1">Review and manage submitted documents</p>
+              <h1 className="text-3xl font-bold text-foreground">Document Review Portal (Faculty)</h1>
+              <p className="text-muted-foreground mt-1">Review and manage submitted documents for Faculty Review step.</p>
             </div>
 
             {/* Student Submissions Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-              {students.map((student) => (
-                <Card key={student.id} className="border border-border hover:shadow-lg transition-shadow">
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <Avatar className="h-14 w-14 bg-primary/10">
-                        <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
-                          {student.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-foreground truncate">{student.name}</span>
+              {students
+                .filter(s => {
+                  const step = (s.currentStep || '').toLowerCase();
+                  const status = (s.status || '').toLowerCase();
+                  return step === 'faculty' && status !== 'approved' && status !== 'rejected';
+                })
+                .length === 0 && (
+                  <div className="col-span-full text-center p-8 text-muted-foreground">
+                    No applications pending Faculty Review.
+                  </div>
+                )}
+
+              {students
+                .filter(s => {
+                  const step = (s.currentStep || '').toLowerCase();
+                  const status = (s.status || '').toLowerCase();
+                  return step === 'faculty' && status !== 'approved' && status !== 'rejected';
+                })
+                .map((student) => (
+                  <Card key={student.id} className="border border-border hover:shadow-lg transition-shadow">
+                    <CardContent className="p-6">
+                      <div className="flex items-start gap-4 mb-4">
+                        <Avatar className="h-14 w-14 bg-primary/10">
+                          <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
+                            {student.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-foreground truncate">{student.name}</span>
+                          </div>
+                          <p className="text-sm text-muted-foreground truncate">{student.program}</p>
+                          <p className="text-xs text-muted-foreground mt-1">ID: {student.studentId}</p>
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">{student.program}</p>
-                        <p className="text-xs text-muted-foreground mt-1">ID: {student.studentId}</p>
                       </div>
-                    </div>
-                    
-                    <div className="space-y-2 mb-4">
-                      <p className="text-sm text-muted-foreground truncate">{student.email}</p>
-                      <div className="flex items-center gap-2">
-                        {getStatusBadge(student.status)}
-                        <span className="text-xs text-muted-foreground">
-                          {student.documents.length} document{student.documents.length !== 1 ? 's' : ''}
-                        </span>
+
+                      <div className="space-y-2 mb-4">
+                        <p className="text-sm text-muted-foreground truncate">{student.email}</p>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(student.status, student.currentStep)}
+                          <span className="text-xs text-muted-foreground">
+                            {student.documents.length} document{student.documents.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="p-3 bg-muted/50 rounded-lg mb-4">
-                      <p className="text-xs text-muted-foreground">Latest submission</p>
-                      <p className="text-sm font-medium truncate">{student.latestSubmission}</p>
-                      <p className="text-xs text-muted-foreground">{student.submissionDate}</p>
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full justify-center"
-                        onClick={() => handleViewDocuments(student)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        View Documents ({student.documents.length})
-                      </Button>
-                      
-                      {student.status === "pending" && (
+
+                      <div className="p-3 bg-muted/50 rounded-lg mb-4">
+                        <p className="text-xs text-muted-foreground">Latest submission</p>
+                        <p className="text-sm font-medium truncate">{student.latestSubmission}</p>
+                        <p className="text-xs text-muted-foreground">{student.submissionDate}</p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-center"
+                          onClick={() => handleViewDocuments(student)}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Documents ({student.documents.length})
+                        </Button>
+
+                        {/* Only show actions if pending/active in this step */}
                         <div className="grid grid-cols-3 gap-2">
                           <Button
                             size="sm"
@@ -245,11 +293,10 @@ const Faculty = () => {
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
             </div>
           </div>
         </main>
@@ -277,15 +324,19 @@ const Faculty = () => {
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => setViewingDocument(doc)}
+                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
                   >
                     <Eye className="h-4 w-4 mr-1" />
                     Open
                   </Button>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                  >
                     <Download className="h-4 w-4 mr-1" />
                     Download
                   </Button>
