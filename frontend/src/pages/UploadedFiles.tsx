@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
+import { DocumentViewer } from '@/components/DocumentViewer';
 
 interface Document {
   type: string;
@@ -22,6 +23,8 @@ interface Application {
 
 const UploadedFiles = () => {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState<{ url: string; name: string; type: string } | null>(null);
 
   /* API Integration */
   const [loading, setLoading] = useState(true);
@@ -170,14 +173,30 @@ const UploadedFiles = () => {
                             </div>
                             <div className="flex gap-4">
                               <button
-                                onClick={() => handleDownload(doc.url)}
+                                onClick={async () => {
+                                  const { API_BASE_URL } = await import('@/lib/api');
+                                  setCurrentDocument({
+                                    url: `${API_BASE_URL}/${doc.url}`,
+                                    name: doc.fileName,
+                                    type: doc.type
+                                  });
+                                  setDocumentViewerOpen(true);
+                                }}
                                 className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
                               >
                                 <Eye className="w-4 h-4" />
                                 View
                               </button>
                               <button
-                                onClick={() => handleDownload(doc.url)}
+                                onClick={async () => {
+                                  const { API_BASE_URL } = await import('@/lib/api');
+                                  const link = document.createElement('a');
+                                  link.href = `${API_BASE_URL}/${doc.url}`;
+                                  link.download = doc.fileName;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
                                 className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
                               >
                                 <Download className="w-4 h-4" />
@@ -202,6 +221,20 @@ const UploadedFiles = () => {
           </main>
         </div>
       </div>
+
+      {/* Document Viewer */}
+      {currentDocument && (
+        <DocumentViewer
+          isOpen={documentViewerOpen}
+          onClose={() => {
+            setDocumentViewerOpen(false);
+            setCurrentDocument(null);
+          }}
+          documentUrl={currentDocument.url}
+          documentName={currentDocument.name}
+          documentType={currentDocument.type}
+        />
+      )}
     </SidebarProvider>
   );
 };

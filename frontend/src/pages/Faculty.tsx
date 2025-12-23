@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { getAllApplications, processApplication, API_BASE_URL } from "@/lib/api";
 import { Loader } from "@/components/ui/loader";
+import { DocumentViewer } from "@/components/DocumentViewer";
 
 interface StudentSubmission {
   id: string;
@@ -44,6 +45,8 @@ const Faculty = () => {
   const [revisionComment, setRevisionComment] = useState("");
   const [actionStudent, setActionStudent] = useState<StudentSubmission | null>(null);
   const [viewingDocument, setViewingDocument] = useState<{ name: string; type: string; date: string; url: string } | null>(null);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState<{ url: string; name: string; type: string } | null>(null);
 
   const fetchApplications = async () => {
     try {
@@ -327,7 +330,14 @@ const Faculty = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                    onClick={() => {
+                      setCurrentDocument({
+                        url: `${API_BASE_URL}/${doc.url}`,
+                        name: doc.name,
+                        type: doc.type
+                      });
+                      setDocumentViewerOpen(true);
+                    }}
                   >
                     <Eye className="h-4 w-4 mr-1" />
                     Open
@@ -335,7 +345,14 @@ const Faculty = () => {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                    onClick={() => {
+                      const link = document.createElement('a');
+                      link.href = `${API_BASE_URL}/${doc.url}`;
+                      link.download = doc.name;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
                   >
                     <Download className="h-4 w-4 mr-1" />
                     Download
@@ -393,6 +410,20 @@ const Faculty = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Document Viewer */}
+      {currentDocument && (
+        <DocumentViewer
+          isOpen={documentViewerOpen}
+          onClose={() => {
+            setDocumentViewerOpen(false);
+            setCurrentDocument(null);
+          }}
+          documentUrl={currentDocument.url}
+          documentName={currentDocument.name}
+          documentType={currentDocument.type}
+        />
+      )}
     </SidebarProvider>
   );
 };

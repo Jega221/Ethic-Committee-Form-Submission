@@ -11,6 +11,7 @@ const {
   modifyApplication
 } = require('../controllers/applicationController');
 const pool = require('../db/index');
+const { verifyToken, isAdmin } = require('../middlewares/superAdminMiddelware');
 
 // set up multer to store files in backend/uploads temporarily
 const storage = multer.diskStorage({
@@ -23,10 +24,10 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 // GET all applications
-router.get('/', getAllApplications);
+router.get('/', verifyToken, isAdmin, getAllApplications);
 
 // Get applications by researcher ID
-router.get('/researcher/:id', async (req, res) => {
+router.get('/researcher/:id', verifyToken, async (req, res) => {
   const { id } = req.params;
   const researcherId = parseInt(id, 10);
 
@@ -68,20 +69,20 @@ router.get('/researcher/:id', async (req, res) => {
 
 
 // POST submit a new application with documents
-router.post('/', upload.array('documents', 5), submitApplication);
+router.post('/', verifyToken, upload.array('documents', 5), submitApplication);
 
 // Update application status (Approve / Reject / Revision)
-router.patch('/:id/status', updateApplicationStatus);
+router.patch('/:id/status', verifyToken, updateApplicationStatus);
 
 // GET all reviews for one application
-router.get('/:id/reviews', getApplicationReviews);
+router.get('/:id/reviews', verifyToken, getApplicationReviews);
 
 // Modify application (only if status = 'Revision Requested')
-router.put('/:id', upload.array('documents', 5), modifyApplication);
+router.put('/:id', verifyToken, upload.array('documents', 5), modifyApplication);
 
 
 // GET archived applications
-router.get('/archived', getArchivedApplications);
+router.get('/archived', verifyToken, getArchivedApplications);
 
 
 

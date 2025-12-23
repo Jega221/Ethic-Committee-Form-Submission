@@ -12,7 +12,9 @@ const path = require('path');
 
 // ✅ 1. Submit a new application (Researcher)
 async function submitApplication(req, res) {
-  const { user_id, faculty_id, committee_id, title, description } = req.body;
+  // Use authenticated user ID from req.user
+  const user_id = req.user.id;
+  const { faculty_id, committee_id, title, description } = req.body;
   const files = req.files || [];
 
   // Checklist validation
@@ -170,6 +172,15 @@ async function updateApplicationStatus(req, res) {
 async function getApplicationReviews(req, res) {
   const { id } = req.params;
   try {
+    // Ownership check: Researchers can only see reviews for their own applications
+    const appCheck = await pool.query('SELECT researcher_id FROM application WHERE application_id = $1', [id]);
+    if (appCheck.rows.length > 0) {
+      const ownerId = appCheck.rows[0].researcher_id;
+      if (req.user.role !== 'admin' && req.user.role !== 'super_admin' && ownerId !== req.user.id) {
+        return res.status(403).json({ error: "Access denied. You can only view reviews for your own applications." });
+      }
+    }
+
     const query = `
       SELECT 
         ar.review_id,
@@ -226,6 +237,11 @@ async function modifyApplication(req, res) {
     }
 
     const app = result.rows[0];
+
+    // Ownership check: Only the researcher who submitted it can modify it
+    if (app.researcher_id !== req.user.id && req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+      return res.status(403).json({ error: "Access denied. You can only modify your own applications." });
+    }
 
     // Only allowed when status = Revision Requested
     if (app.status !== "Revision Requested") {

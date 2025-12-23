@@ -40,7 +40,22 @@ const Login = () => {
         title: "Login Successful",
         description: `Welcome back, ${data.user.name}!`,
       });
-      navigate("/dashboard");
+
+      // Role-based redirection
+      const role = data.user.role;
+      if (role === 'admin' || role === 6) {
+        navigate("/admin");
+      } else if (role === 'super_admin' || role === 1) {
+        navigate("/super-admin");
+      } else if (role === 5) {
+        navigate("/rector");
+      } else if (role === 4) {
+        navigate("/faculty");
+      } else if (role === 2) {
+        navigate("/committee");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: any) {
       console.error(err);
       toast({
@@ -142,15 +157,7 @@ const Login = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between text-sm py-2">
-                <label className="flex items-center gap-2 cursor-pointer group">
-                  <input type="checkbox" className="w-4 h-4 rounded border-slate-300 text-[#1a0b4b] focus:ring-[#1a0b4b]" />
-                  <span className="text-slate-600 group-hover:text-slate-900">Remember me</span>
-                </label>
-                <button type="button" className="text-slate-500 hover:text-[#1a0b4b] font-medium transition-colors">
-                  Forgot password?
-                </button>
-              </div>
+
 
               <button
                 type="submit"

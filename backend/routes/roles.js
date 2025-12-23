@@ -2,9 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware');
+const { verifyToken } = require('../middlewares/superAdminMiddelware');
+const { isAdminOrSuperAdmin } = require('../middlewares/adminOrSuperAdminMiddleware');
 
-router.put('/setRole', verifyToken, isSuperAdmin, async (req, res) => {
+router.put('/setRole', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
   const { id, role_id } = req.body;
 
   try {
@@ -28,7 +29,7 @@ router.put('/setRole', verifyToken, isSuperAdmin, async (req, res) => {
 });
 
 // Set Faculty
-router.put('/setFaculty', verifyToken, isSuperAdmin, async (req, res) => {
+router.put('/setFaculty', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
   const { id, faculty_id } = req.body;
 
   try {

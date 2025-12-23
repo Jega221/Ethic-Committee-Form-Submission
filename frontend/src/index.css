@@ -7,7 +7,13 @@ All colors MUST be HSL.
 */
 
 @layer base {
-  :root {
+  @layer utilities {
+  .card-glass {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
+  }
+}
+
+:root {
     --background: 0 0% 100%;
     --foreground: 210 25% 25%;
 

@@ -135,7 +135,36 @@ router.post('/', async (req, res) => {
       return res.json({ message: 'Process reset to first step (rejected)', process: updateRes.rows[0] });
     }
 
-    return res.status(400).json({ message: 'Invalid action. Use "approve" or "rejected".' });
+    if (action.toLowerCase() === 'revision' || action.toLowerCase() === 'modification') {
+      // Reset to first step of workflow and set status to 'Revision Requested'
+      const first = proc.first_step || null;
+      const second = proc.second_step || null;
+
+      if (!first) {
+        return res.status(400).json({ message: 'Workflow first step not defined' });
+      }
+
+      await pool.query('BEGIN');
+      try {
+        const updateProcRes = await pool.query(
+          `UPDATE process SET current_step = $1, next_step = $2, updated_at = NOW() WHERE id = $3 RETURNING *`,
+          [first, second, proc.id]
+        );
+
+        await pool.query(
+          `UPDATE application SET status = 'Revision Requested' WHERE application_id = $1`,
+          [application_id]
+        );
+
+        await pool.query('COMMIT');
+        return res.json({ message: 'Revision requested (reset to first step)', process: updateProcRes.rows[0] });
+      } catch (err) {
+        await pool.query('ROLLBACK');
+        throw err;
+      }
+    }
+
+    return res.status(400).json({ message: 'Invalid action. Use "approve", "rejected", or "revision".' });
   } catch (err) {
     console.error('Process action error:', err);
     return res.status(500).json({ message: 'Server error' });

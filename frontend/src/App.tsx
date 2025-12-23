@@ -16,7 +16,10 @@ import AdminDashboard from "./pages/AdminDashboard";
 import ReviewOversight from "./pages/ReviewOversight";
 import Faculty from "./pages/Faculty";
 import Committee from "./pages/Committee";
+import SuperAdminPortal from "./pages/SuperAdminPortal";
+import Rector from "./pages/Rector";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -30,19 +33,23 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/new-application" element={<NewApplication />} />
-          <Route path="/uploaded-files" element={<UploadedFiles />} />
-          <Route path="/study-status" element={<StudyStatus />} />
-          <Route path="/agenda" element={<Agenda />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
 
-          <Route path="/admin/review-oversight" element={<ReviewOversight />} />
+          {/* Protected Routes */}
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={[3]}><Dashboard /></ProtectedRoute>} />
+          <Route path="/new-application" element={<ProtectedRoute allowedRoles={[3]}><NewApplication /></ProtectedRoute>} />
+          <Route path="/uploaded-files" element={<ProtectedRoute allowedRoles={[3]}><UploadedFiles /></ProtectedRoute>} />
+          <Route path="/study-status" element={<ProtectedRoute allowedRoles={[3]}><StudyStatus /></ProtectedRoute>} />
+          <Route path="/agenda" element={<ProtectedRoute allowedRoles={[3]}><Agenda /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute allowedRoles={[3]}><Settings /></ProtectedRoute>} />
 
-          <Route path="/faculty" element={<Faculty />} />
-          <Route path="/committee" element={<Committee />} />
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 6]}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 6]}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/review-oversight" element={<ProtectedRoute allowedRoles={['admin', 6]}><ReviewOversight /></ProtectedRoute>} />
+
+          <Route path="/faculty" element={<ProtectedRoute allowedRoles={[4]}><Faculty /></ProtectedRoute>} />
+          <Route path="/committee" element={<ProtectedRoute allowedRoles={[2]}><Committee /></ProtectedRoute>} />
+          <Route path="/rector" element={<ProtectedRoute allowedRoles={[5]}><Rector /></ProtectedRoute>} />
+          <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin', 1]}><SuperAdminPortal /></ProtectedRoute>} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

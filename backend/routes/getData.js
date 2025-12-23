@@ -10,7 +10,7 @@ const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelwa
 router.get('/users', verifyToken, async (req, res) => {
   try {
     const query = `
-      SELECT u.id, u.name, u.surname, u.email, r.role_name, f.name AS faculty_name, u.created_at
+      SELECT u.id, u.name, u.surname, u.email, u.role_id, u.faculty_id, r.role_name, f.name AS faculty_name, u.created_at
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
       LEFT JOIN faculties f ON u.faculty_id = f.id

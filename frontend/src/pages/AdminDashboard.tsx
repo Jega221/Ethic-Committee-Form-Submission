@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Trash2 } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AdminSidebar } from '@/components/AdminSidebar';
@@ -28,49 +29,112 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 
+import { toast } from "sonner";
+import { setUserRole, setUserFaculty, getFaculties, getUsers } from '@/lib/api';
+import { Loader2, AlertCircle } from 'lucide-react';
+
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
+  role_id?: number;
+  faculty_id?: number;
+  faculty_name?: string;
   status: string;
 }
 
 const initialUsers: User[] = [];
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
+  const [faculties, setFaculties] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   React.useEffect(() => {
-    const fetchUsers = async () => {
+    const profile = localStorage.getItem('userProfile');
+    if (profile) setUserProfile(JSON.parse(profile));
+  }, []);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('http://localhost:3000/api/getData/users', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        if (response.ok) {
-          const data = await response.json();
-          // Map backend data to frontend interface
-          const mappedUsers = data.map((u: any) => ({
-            id: u.id.toString(),
-            name: `${u.name} ${u.surname}`,
-            email: u.email,
+        setLoading(true);
+        setError(null);
+        console.log('Fetching users and faculties...');
+
+        const [uRes, fRes] = await Promise.all([
+          getUsers(),
+          getFaculties()
+        ]);
+
+        if (Array.isArray(uRes.data)) {
+          const mappedUsers = uRes.data.map((u: any) => ({
+            id: u.id?.toString() || Math.random().toString(),
+            name: `${u.name || ''} ${u.surname || ''}`.trim() || 'No Name',
+            email: u.email || 'No Email',
             role: u.role_name || 'User',
+            role_id: u.role_id,
+            faculty_id: u.faculty_id,
+            faculty_name: u.faculty_name,
             status: u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Active'
           }));
           setUsers(mappedUsers);
+        } else {
+          console.error('Users data is not an array:', uRes.data);
+          setError('Invalid data format received for users');
         }
-      } catch (error) {
-        console.error('Failed to fetch users', error);
+
+        setFaculties(Array.isArray(fRes.data) ? fRes.data : []);
+      } catch (error: any) {
+        const status = error.response?.status;
+        const message = error.response?.data?.message || "";
+
+        // Auto-logout if session is expired or invalid
+        if (status === 403 && (message.includes("expired") || message.includes("JWT_VERIFY_FAIL"))) {
+          toast.error("Session expired. Please log in again.");
+          localStorage.clear();
+          navigate('/login');
+          return;
+        }
+
+        console.error('Failed to fetch data:', error);
+        const serverMessage = message || error.message || 'Failed to connection to server';
+        setError(serverMessage);
+        toast.error(`Error: ${serverMessage}`);
       } finally {
         setLoading(false);
       }
     };
-    fetchUsers();
+    fetchData();
   }, []);
+
+  const handleRoleChange = async (userId: string, roleId: string) => {
+    try {
+      await setUserRole(userId, roleId);
+      toast.success("User role updated");
+      // Update local state
+      setUsers(users.map(u => u.id === userId ? { ...u, role_id: parseInt(roleId) } : u));
+    } catch (err) {
+      toast.error("Failed to update role");
+    }
+  };
+
+  const handleFacultyChange = async (userId: string, facultyId: string) => {
+    try {
+      await setUserFaculty(userId, facultyId);
+      toast.success("User faculty updated");
+      // Update local state
+      const fac = faculties.find(f => f.id.toString() === facultyId);
+      setUsers(users.map(u => u.id === userId ? { ...u, faculty_id: parseInt(facultyId), faculty_name: fac?.name || '' } : u));
+    } catch (err) {
+      toast.error("Failed to update faculty");
+    }
+  };
+
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -80,8 +144,11 @@ export default function AdminDashboard() {
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const searchLow = searchQuery.toLowerCase();
+    const name = user.name?.toLowerCase() || '';
+    const email = user.email?.toLowerCase() || '';
+
+    const matchesSearch = name.includes(searchLow) || email.includes(searchLow);
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
     return matchesSearch && matchesRole;
   });
@@ -133,6 +200,7 @@ export default function AdminDashboard() {
             name: `${u.name} ${u.surname}`,
             email: u.email,
             role: u.role_name || newUserRole,
+            role_id: u.role_id,
             status: 'Just Now',
           };
           setUsers([...users, newUser]);
@@ -183,7 +251,52 @@ export default function AdminDashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-                <button onClick={() => setIsAddUserOpen(true)} className="bg-primary text-white px-3 py-2 rounded">Add User</button>
+                {userProfile?.role === 'super_admin' && (
+                  <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-[#1a0b4b] hover:bg-[#3a2b8b]">Add User</Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Add New User</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                          <Label>Full Name</Label>
+                          <Input
+                            value={newUserName}
+                            onChange={(e) => setNewUserName(e.target.value)}
+                            placeholder="John Doe"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input
+                            value={newUserEmail}
+                            onChange={(e) => setNewUserEmail(e.target.value)}
+                            placeholder="john@example.com"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Initial Role</Label>
+                          <Select value={newUserRole} onValueChange={setNewUserRole}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Researcher">Researcher</SelectItem>
+                              <SelectItem value="Faculty Admin">Faculty Admin</SelectItem>
+                              <SelectItem value="Admin">Admin</SelectItem>
+                              <SelectItem value="Committee Member">Committee Member</SelectItem>
+                              <SelectItem value="Rector">Rector</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button onClick={handleAddUser} className="w-full">Create User</Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                )}
                 <button onClick={handleExport} className="border px-3 py-2 rounded">Export</button>
               </div>
             </div>
@@ -216,9 +329,11 @@ export default function AdminDashboard() {
                     <SelectContent>
                       <SelectItem value="all">All Roles</SelectItem>
                       <SelectItem value="Admin">Admin</SelectItem>
-                      <SelectItem value="Faculty">Faculty</SelectItem>
+                      <SelectItem value="Faculty Admin">Faculty Admin</SelectItem>
                       <SelectItem value="Researcher">Researcher</SelectItem>
                       <SelectItem value="Committee Member">Committee Member</SelectItem>
+                      <SelectItem value="Rector">Rector</SelectItem>
+                      <SelectItem value="Super Admin">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -239,88 +354,99 @@ export default function AdminDashboard() {
               </div>
 
               {/* Table */}
-              <div className="rounded-lg border border-border overflow-hidden">
-                <Table className="min-w-full">
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead>Name</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="w-12" />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredUsers.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
-                        <TableCell>{user.role}</TableCell>
-                        <TableCell className="text-muted-foreground">{user.status}</TableCell>
-                        <TableCell>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
-                            aria-label={`Delete ${user.name}`}
-                          >
-                            <Trash2 className="w-4 h-4 text-destructive" />
-                          </button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Bottom Actions */}
-              <div className="flex flex-col sm:flex-row gap-4 mt-6 justify-center">
-                <Dialog open={isAddUserOpen} onOpenChange={setIsAddUserOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-primary">Add New User</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Add New User</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div>
-                        <Label htmlFor="name">Name</Label>
-                        <Input
-                          id="name"
-                          value={newUserName}
-                          onChange={(e) => setNewUserName(e.target.value)}
-                          placeholder="Enter name"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={newUserEmail}
-                          onChange={(e) => setNewUserEmail(e.target.value)}
-                          placeholder="Enter email"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="role">Role</Label>
-                        <Select value={newUserRole} onValueChange={setNewUserRole}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Faculty">Faculty</SelectItem>
-                            <SelectItem value="Researcher">Researcher</SelectItem>
-                            <SelectItem value="Committee Member">Committee Member</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
+              <div className="rounded-lg border border-border overflow-hidden bg-card">
+                {loading ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                    <p className="text-muted-foreground animate-pulse">Fetching users...</p>
+                  </div>
+                ) : error ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4 text-destructive">
+                    <AlertCircle className="w-12 h-12" />
+                    <div className="text-center">
+                      <p className="font-semibold italic font-serif">Oops! Something went wrong</p>
+                      <p className="text-sm opacity-80">{error}</p>
                     </div>
-                  </DialogContent>
-                </Dialog>
+                    <Button variant="outline" onClick={() => window.location.reload()}>Try Again</Button>
+                  </div>
+                ) : filteredUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                    <Search className="w-12 h-12 mb-4 opacity-20" />
+                    <p>No users found matching your filters.</p>
+                  </div>
+                ) : (
+                  <Table className="min-w-full">
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead>User / Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Faculty</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="w-12 text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredUsers.map((user) => (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{user.name}</span>
+                              <span className="text-xs text-muted-foreground">{user.email}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={user.role_id?.toString()}
+                              onValueChange={(val) => handleRoleChange(user.id, val)}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs">
+                                <SelectValue placeholder="Role" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">Super Admin</SelectItem>
+                                <SelectItem value="2">Committee Member</SelectItem>
+                                <SelectItem value="3">Researcher</SelectItem>
+                                <SelectItem value="4">Faculty Admin</SelectItem>
+                                <SelectItem value="5">Rector</SelectItem>
+                                <SelectItem value="6">Admin</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={user.faculty_id?.toString()}
+                              onValueChange={(val) => handleFacultyChange(user.id, val)}
+                            >
+                              <SelectTrigger className="w-40 h-8 text-xs">
+                                <SelectValue placeholder="Faculty" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {faculties.map(f => (
+                                  <SelectItem key={f.id} value={f.id.toString()}>{f.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground text-xs">{user.status}</TableCell>
+                          <TableCell>
+                            <div className="flex justify-end">
+                              <button
+                                onClick={() => handleDeleteUser(user.id)}
+                                className="p-2 hover:bg-destructive/10 rounded-lg transition-colors"
+                                aria-label={`Delete ${user.name}`}
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
               </div>
+
+              {/* Bottom Actions removed as Add User is disabled for Admin */}
 
             </div>
           </main>

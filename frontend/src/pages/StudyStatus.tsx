@@ -14,6 +14,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Loader } from '@/components/ui/loader';
+import { DocumentViewer } from '@/components/DocumentViewer';
 
 interface SubmittedApplication {
   id: string;
@@ -53,7 +54,8 @@ const getStatusIndex = (step: string): number => {
 const calcProgressPercent = (index: number) => {
   const maxIndex = Math.max(statusSteps.length - 1, 1);
   const clamped = Math.max(0, Math.min(index, maxIndex));
-  return (clamped / maxIndex) * 100;
+  // Total span is 75% (from 12.5% to 87.5%)
+  return (clamped / maxIndex) * 75;
 };
 
 const getExpectedDecisionDate = (submissionDate: string): string => {
@@ -73,6 +75,8 @@ const getStatusColor = (status: string) => {
 export default function StudyStatus() {
   const [applications, setApplications] = useState<SubmittedApplication[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
+  const [currentDocument, setCurrentDocument] = useState<{ url: string; name: string; type: string } | null>(null);
 
   /* API Integration */
   const [loading, setLoading] = useState(true);
@@ -202,7 +206,14 @@ export default function StudyStatus() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-primary hover:text-primary/80"
-                                onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                onClick={() => {
+                                  setCurrentDocument({
+                                    url: `${API_BASE_URL}/${doc.url}`,
+                                    name: doc.fileName,
+                                    type: doc.type
+                                  });
+                                  setDocumentViewerOpen(true);
+                                }}
                                 title="View document"
                               >
                                 <Eye className="w-4 h-4" />
@@ -211,7 +222,14 @@ export default function StudyStatus() {
                                 variant="ghost"
                                 size="sm"
                                 className="text-primary hover:text-primary/80"
-                                onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = `${API_BASE_URL}/${doc.url}`;
+                                  link.download = doc.fileName;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                }}
                                 title="Download document"
                               >
                                 <Download className="w-4 h-4" />
@@ -238,10 +256,10 @@ export default function StudyStatus() {
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between relative">
                       {/* Connecting Line - Background */}
-                      <div className="absolute top-5 left-[10%] right-[10%] h-1 bg-muted rounded-full" />
+                      <div className="absolute top-5 left-[12.5%] right-[12.5%] h-1 bg-muted rounded-full" />
                       {/* Connecting Line - Progress */}
                       <div
-                        className="absolute top-5 left-[10%] h-1 bg-success rounded-full transition-all duration-500"
+                        className="absolute top-5 left-[12.5%] h-1 bg-success rounded-full transition-all duration-500"
                         style={{ width: `${progressPercent}%` }}
                       />
 
@@ -479,7 +497,14 @@ export default function StudyStatus() {
                                       variant="ghost"
                                       size="sm"
                                       className="text-primary"
-                                      onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                      onClick={() => {
+                                        setCurrentDocument({
+                                          url: `${API_BASE_URL}/${doc.url}`,
+                                          name: doc.fileName,
+                                          type: doc.type
+                                        });
+                                        setDocumentViewerOpen(true);
+                                      }}
                                       title="View document"
                                     >
                                       <Eye className="w-4 h-4" />
@@ -488,7 +513,14 @@ export default function StudyStatus() {
                                       variant="ghost"
                                       size="sm"
                                       className="text-primary"
-                                      onClick={() => window.open(`${API_BASE_URL}/${doc.url}`, '_blank')}
+                                      onClick={() => {
+                                        const link = document.createElement('a');
+                                        link.href = `${API_BASE_URL}/${doc.url}`;
+                                        link.download = doc.fileName;
+                                        document.body.appendChild(link);
+                                        link.click();
+                                        document.body.removeChild(link);
+                                      }}
                                       title="Download document"
                                     >
                                       <Download className="w-4 h-4" />
@@ -520,6 +552,20 @@ export default function StudyStatus() {
           </div>
         </main>
       </div>
+
+      {/* Document Viewer */}
+      {currentDocument && (
+        <DocumentViewer
+          isOpen={documentViewerOpen}
+          onClose={() => {
+            setDocumentViewerOpen(false);
+            setCurrentDocument(null);
+          }}
+          documentUrl={currentDocument.url}
+          documentName={currentDocument.name}
+          documentType={currentDocument.type}
+        />
+      )}
     </SidebarProvider>
   );
 }

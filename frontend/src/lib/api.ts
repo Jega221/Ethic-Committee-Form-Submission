@@ -69,6 +69,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Global response interceptor to handle session expiration
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+      console.warn("Session expired or unauthorized. Logging out...");
+      localStorage.removeItem("token");
+      localStorage.removeItem("userProfile");
+      window.location.href = "/login";
+    }
+    return Promise.reject(error);
+  }
+);
+
 // 5) Login helper
 export async function login(email: string, password: string) {
   return authRequest<{ token: string; user: any }>("/auth/login", {
@@ -77,7 +91,6 @@ export async function login(email: string, password: string) {
   });
 }
 
-// 6) Create application helper
 // 6) Create application helper
 export async function createApplication(payload: FormData) {
   return api.post("/api/applications", payload);
@@ -101,4 +114,56 @@ export async function processApplication(applicationId: string | number, action:
 // 10) Update Application Status (Approve/Reject/Revision with comments)
 export async function updateApplicationStatus(applicationId: string | number, payload: { status: string, comment?: string, committee_id?: number }) {
   return api.patch(`/api/applications/${applicationId}/status`, payload);
+}
+
+// 11) Super Admin: User Management
+export async function getUsers() {
+  return api.get('/api/getData/users');
+}
+
+export async function createUser(data: { name: string, email: string, role: string }) {
+  return api.post('/api/admin/users', data);
+}
+
+export async function deleteUser(id: string | number) {
+  return api.delete(`/api/admin/users/${id}`);
+}
+
+// 12) Super Admin: Faculty Management
+export async function getFaculties() {
+  return api.get('/api/getData/faculty');
+}
+
+export async function createFaculty(name: string) {
+  return api.post('/api/faculty', { faculty_name: name });
+}
+
+export async function updateFaculty(id: string | number, name: string) {
+  return api.put(`/api/faculty/${id}`, { name });
+}
+
+export async function deleteFaculty(id: string | number) {
+  return api.delete(`/api/faculty/${id}`);
+}
+
+// 13) Super Admin: Workflow Management
+export async function getWorkflows() {
+  return api.get('/api/workflow');
+}
+
+export async function createWorkflow(data: any) {
+  return api.post('/api/workflow', data);
+}
+
+export async function setCurrentWorkflow(id: string | number) {
+  return api.put(`/api/workflow/${id}/set-current`);
+}
+
+// 14) User Role & Faculty Management
+export async function setUserRole(userId: string | number, roleId: string | number) {
+  return api.put('/api/Role/setRole', { id: userId, role_id: roleId });
+}
+
+export async function setUserFaculty(userId: string | number, facultyId: string | number) {
+  return api.put('/api/Role/setFaculty', { id: userId, faculty_id: facultyId });
 }
