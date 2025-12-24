@@ -85,7 +85,7 @@ const Login = () => {
         <div className="relative z-10 flex flex-col justify-center px-16 text-white max-w-2xl">
           <h1 className="text-5xl font-bold mb-6 leading-tight">
             Welcome to <br />
-            <span className="text-[#f5a623]">Ethics Committee</span>
+            <span className="text-[#f5a623] mt-20 block">Ethics Committee</span>
           </h1>
           <p className="text-lg text-slate-100 leading-relaxed mb-8 font-medium">
             Advancing research integrity at Final International University.

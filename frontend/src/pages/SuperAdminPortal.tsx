@@ -55,6 +55,21 @@ import {
     setCurrentWorkflow,
     getAllApplications
 } from '@/lib/api';
+import {
+    PieChart,
+    Pie,
+    Cell,
+    BarChart,
+    Bar,
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer
+} from 'recharts';
 
 const SuperAdminPortal = () => {
     const [activeTab, setActiveTab] = useState("overview");
@@ -234,7 +249,8 @@ const SuperAdminPortal = () => {
 
                                 {/* OVERVIEW TAB */}
                                 <TabsContent value="overview" className="mt-0">
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                                    {/* Summary Stats */}
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                                         <Card className="border-none shadow-sm card-glass">
                                             <CardContent className="p-6">
                                                 <div className="flex items-center justify-between mb-2">
@@ -271,6 +287,110 @@ const SuperAdminPortal = () => {
                                                 <h3 className="text-xl font-bold truncate">
                                                     {workflows.find(w => w.status === 'current')?.id ? `ID: ${workflows.find(w => w.status === 'current')?.id}` : 'None'}
                                                 </h3>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    {/* Charts Section */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                        {/* User Distribution by Role - Pie Chart */}
+                                        <Card className="border-none shadow-sm card-glass">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg font-bold">User Distribution by Role</CardTitle>
+                                                <CardDescription>Breakdown of users across different roles</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <ResponsiveContainer width="100%" height={300}>
+                                                    <PieChart>
+                                                        <Pie
+                                                            data={(() => {
+                                                                const roleCounts = users.reduce((acc: any, user: any) => {
+                                                                    const role = user.role_name || 'Unknown';
+                                                                    acc[role] = (acc[role] || 0) + 1;
+                                                                    return acc;
+                                                                }, {});
+                                                                return Object.entries(roleCounts).map(([name, value]) => ({ name, value }));
+                                                            })()}
+                                                            cx="50%"
+                                                            cy="50%"
+                                                            labelLine={false}
+                                                            label={(entry) => `${entry.name}: ${entry.value}`}
+                                                            outerRadius={100}
+                                                            fill="#8884d8"
+                                                            dataKey="value"
+                                                        >
+                                                            {(() => {
+                                                                const COLORS = ['#1a0b4b', '#3a2b8b', '#5a4bab', '#f5a623', '#d4860f', '#b87333'];
+                                                                const roleCounts = users.reduce((acc: any, user: any) => {
+                                                                    const role = user.role_name || 'Unknown';
+                                                                    acc[role] = (acc[role] || 0) + 1;
+                                                                    return acc;
+                                                                }, {});
+                                                                return Object.entries(roleCounts).map((_, index) => (
+                                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                                ));
+                                                            })()}
+                                                        </Pie>
+                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                                                    </PieChart>
+                                                </ResponsiveContainer>
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Application Status - Bar Chart */}
+                                        <Card className="border-none shadow-sm card-glass">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg font-bold">Application Status Overview</CardTitle>
+                                                <CardDescription>Current state of all submitted applications</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <ResponsiveContainer width="100%" height={300}>
+                                                    <BarChart
+                                                        data={(() => {
+                                                            const statusCounts = applications.reduce((acc: any, app: any) => {
+                                                                const status = app.status || 'Unknown';
+                                                                acc[status] = (acc[status] || 0) + 1;
+                                                                return acc;
+                                                            }, {});
+                                                            return Object.entries(statusCounts).map(([name, count]) => ({ name, count }));
+                                                        })()}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                        <XAxis dataKey="name" stroke="#64748b" />
+                                                        <YAxis stroke="#64748b" />
+                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                                                        <Bar dataKey="count" fill="#f5a623" radius={[8, 8, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Applications by Faculty - Bar Chart */}
+                                        <Card className="border-none shadow-sm card-glass lg:col-span-2">
+                                            <CardHeader>
+                                                <CardTitle className="text-lg font-bold">Applications by Faculty</CardTitle>
+                                                <CardDescription>Distribution of research applications across faculties</CardDescription>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <ResponsiveContainer width="100%" height={300}>
+                                                    <BarChart
+                                                        data={(() => {
+                                                            const facultyCounts = applications.reduce((acc: any, app: any) => {
+                                                                const faculty = app.faculty_name || 'Unknown';
+                                                                acc[faculty] = (acc[faculty] || 0) + 1;
+                                                                return acc;
+                                                            }, {});
+                                                            return Object.entries(facultyCounts).map(([name, count]) => ({ name, count }));
+                                                        })()}
+                                                        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+                                                    >
+                                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                                                        <XAxis dataKey="name" angle={-45} textAnchor="end" height={100} stroke="#64748b" />
+                                                        <YAxis stroke="#64748b" />
+                                                        <Tooltip contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #e2e8f0', borderRadius: '8px' }} />
+                                                        <Bar dataKey="count" fill="#3a2b8b" radius={[8, 8, 0, 0]} />
+                                                    </BarChart>
+                                                </ResponsiveContainer>
                                             </CardContent>
                                         </Card>
                                     </div>
