@@ -55,6 +55,80 @@ router.put('/:id/set-current', verifyToken, isSuperAdmin, async (req, res) => {
 });
 
 // -------------------------------
+// UPDATE workflow (protected, no duplicates)
+// If an identical workflow already exists (different id), return it instead of updating
+// -------------------------------
+router.put('/:id', verifyToken, isSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+  const { first_step, second_step, third_step, fourth_step, fifth_step } = req.body;
+
+  try {
+    // 1. Ensure the target workflow exists
+    const target = await pool.query('SELECT * FROM workflow WHERE id = $1', [id]);
+    if (target.rows.length === 0) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    // 2. Check for duplicate (identical steps) in a different record
+    const duplicateCheck = await pool.query(
+      `SELECT * FROM workflow
+       WHERE first_step IS NOT DISTINCT FROM $1
+         AND second_step IS NOT DISTINCT FROM $2
+         AND third_step IS NOT DISTINCT FROM $3
+         AND fourth_step IS NOT DISTINCT FROM $4
+         AND fifth_step IS NOT DISTINCT FROM $5
+         AND id <> $6`,
+      [first_step, second_step, third_step, fourth_step, fifth_step, id]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      return res.status(200).json({
+        message: 'An identical workflow already exists',
+        workflow: duplicateCheck.rows[0]
+      });
+    }
+
+    // 3. Perform the update
+    const updateResult = await pool.query(
+      `UPDATE workflow
+       SET first_step = $1, second_step = $2, third_step = $3, fourth_step = $4, fifth_step = $5
+       WHERE id = $6
+       RETURNING *`,
+      [first_step, second_step, third_step, fourth_step, fifth_step, id]
+    );
+
+    if (updateResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    res.json({ message: 'Workflow updated successfully', workflow: updateResult.rows[0] });
+
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// -------------------------------
+// DELETE workflow (protected)
+// -------------------------------
+router.delete('/:id', verifyToken, isSuperAdmin, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const deleteResult = await pool.query('DELETE FROM workflow WHERE id = $1 RETURNING *', [id]);
+    if (deleteResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Workflow not found' });
+    }
+
+    res.json({ message: 'Workflow deleted successfully', workflow: deleteResult.rows[0] });
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// -------------------------------
 // CREATE new workflow (protected, no duplicates)
 // -------------------------------
 router.post('/', verifyToken, isSuperAdmin, async (req, res) => {
