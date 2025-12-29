@@ -144,21 +144,23 @@ const Faculty = () => {
 
   const submitRevisionRequest = async () => {
     if (actionStudent) {
-      // Logic for revision request, likely needs a different API endpoint or status update with comment
-      // For now we simulate it or implement if API supports it.
-      // Assuming we just mark status or use a specific endpoint. 
-      // The current plan didn't specify backend change for revision beyond status update.
-      // We will perform a status update for now.
-
-      // NOTE: processApplication endpoint (process.js) doesn't explicitly handle 'revision'
-      // We might need to use updateApplicationStatus(id, { status: 'Revision Requested', comment: ... })
-
-      toast({
-        title: "Revision Requested",
-        description: `Feature pending: Revision request for ${actionStudent.name}.`,
-      });
-      setIsRevisionDialogOpen(false);
-      setActionStudent(null);
+      try {
+        await processApplication(actionStudent.id, 'revision', revisionComment);
+        toast({
+          title: "Revision Requested",
+          description: `Revision request sent for ${actionStudent.name}.`,
+          variant: "default" // or success style if available
+        });
+        setIsRevisionDialogOpen(false);
+        setActionStudent(null);
+        fetchApplications();
+      } catch (error: any) {
+        toast({
+          title: "Action Failed",
+          description: error.message || "Failed to request revision.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

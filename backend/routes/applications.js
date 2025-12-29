@@ -11,7 +11,7 @@ const {
   modifyApplication
 } = require('../controllers/applicationController');
 const pool = require('../db/index');
-const { verifyToken, isAdmin } = require('../middlewares/superAdminMiddelware');
+const { verifyToken, isAdmin, isStaff } = require('../middlewares/superAdminMiddelware');
 
 // set up multer to store files in backend/uploads temporarily
 const storage = multer.diskStorage({
@@ -23,8 +23,8 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// GET all applications
-router.get('/', verifyToken, isAdmin, getAllApplications);
+// GET all applications (Admin + Staff)
+router.get('/', verifyToken, isStaff, getAllApplications);
 
 // Get applications by researcher ID
 router.get('/researcher/:id', verifyToken, async (req, res) => {
@@ -33,6 +33,13 @@ router.get('/researcher/:id', verifyToken, async (req, res) => {
 
   if (isNaN(researcherId)) {
     return res.status(400).json({ error: 'Invalid researcher ID' });
+  }
+
+  // Ownership Check: Ensure logged-in user matches the requested researcher ID
+  // Allow admins/super_admins to bypass this check
+  const isCmdAdmin = req.user.role === 'admin' || req.user.role === 'super_admin' || req.user.role === 1 || req.user.role === 6;
+  if (req.user.id !== researcherId && !isCmdAdmin) {
+    return res.status(403).json({ error: 'Access denied: You can only view your own applications.' });
   }
 
   try {

@@ -109,7 +109,7 @@ router.get('/reviews', verifyToken, async (req, res) => {
   }
 });
 
-router.get('/faculty', async (req, res) => {
+router.get('/faculty', verifyToken, async (req, res) => {
   try {
     const query = `
       SELECT * FROM faculties

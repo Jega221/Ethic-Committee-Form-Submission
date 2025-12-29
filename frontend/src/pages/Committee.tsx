@@ -117,16 +117,8 @@ const Committee = () => {
     if (!selectedItem || !actionType) return;
 
     try {
-      if (actionType === 'revision') {
-        // For Revisions, use the updateApplicationStatus endpoint to save comments
-        await updateApplicationStatus(selectedItem.id, {
-          status: 'Revision Requested',
-          comment: comment
-        });
-      } else {
-        // For Approve/Reject, use the processApplication endpoint to advance workflow
-        await processApplication(selectedItem.id, actionType);
-      }
+      // Unify all actions to use processApplication which now supports comments
+      await processApplication(selectedItem.id, actionType, comment);
 
       toast({
         title: "Success",

@@ -5,7 +5,7 @@ const processSteps = [
   { stepNumber: '1', title: 'Researcher', subtitle: 'Submission' },
   { stepNumber: '2', title: 'Faculty', subtitle: 'Review' },
   { stepNumber: '3', title: 'Ethics', subtitle: 'Committee' },
-  { stepNumber: '4', title: 'Dean', subtitle: 'Review' },
+  { stepNumber: '4', title: 'Rector', subtitle: 'Review' },
   { stepNumber: '5', title: 'Final', subtitle: 'Approval' },
 ];
 

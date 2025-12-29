@@ -137,7 +137,7 @@ const Rector = () => {
     const submitRevisionRequest = async () => {
         if (actionApp) {
             try {
-                await processApplication(actionApp.id, 'revision');
+                await processApplication(actionApp.id, 'revision', revisionComment);
                 toast({
                     title: "Revision Requested",
                     description: `Revision request for ${actionApp.name} has been sent. Application reset to first step.`,

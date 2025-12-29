@@ -47,4 +47,13 @@ const isResearcher = (req, res, next) => {
   next();
 };
 
-module.exports = { verifyToken, isSuperAdmin, isAdmin, isFaculty, isResearcher };
+// Check if role is Committee/Faculty/Admin/SuperAdmin
+const isStaff = (req, res, next) => {
+  const staffRoles = ['admin', 'super_admin', 1, 6, 2, 4, 5]; // 2=Committee, 4=Faculty, 5=Rector
+  if (!staffRoles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access denied: Staff only' });
+  }
+  next();
+};
+
+module.exports = { verifyToken, isSuperAdmin, isAdmin, isFaculty, isResearcher, isStaff };

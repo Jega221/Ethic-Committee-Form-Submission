@@ -52,6 +52,8 @@ import {
     deleteFaculty,
     getWorkflows,
     createWorkflow,
+    updateWorkflow,
+    deleteWorkflow,
     setCurrentWorkflow,
     getAllApplications
 } from '@/lib/api';
@@ -185,6 +187,8 @@ const SuperAdminPortal = () => {
         fifth_step: ''
     });
 
+    const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
+
     const handleCreateWorkflow = async () => {
         try {
             const payload = {
@@ -198,6 +202,44 @@ const SuperAdminPortal = () => {
         } catch (err: any) {
             toast.error(err.response?.data?.error || "Failed to create workflow");
         }
+    };
+
+    const handleUpdateWorkflow = async () => {
+        if (!editingWorkflow) return;
+        try {
+            const payload = {
+                ...newWorkflowSteps,
+                fifth_step: newWorkflowSteps.fifth_step || null
+            };
+            await updateWorkflow(editingWorkflow.id, payload);
+            toast.success("Workflow updated successfully");
+            setEditingWorkflow(null);
+            fetchAllData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Failed to update workflow");
+        }
+    };
+
+    const handleDeleteWorkflow = async (id: string | number) => {
+        if (!confirm("Are you sure you want to delete this workflow?")) return;
+        try {
+            await deleteWorkflow(id);
+            toast.success("Workflow deleted");
+            fetchAllData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || "Failed to delete workflow");
+        }
+    };
+
+    const openEditWorkflow = (workflow: any) => {
+        setEditingWorkflow(workflow);
+        setNewWorkflowSteps({
+            first_step: workflow.first_step || '',
+            second_step: workflow.second_step || '',
+            third_step: workflow.third_step || '',
+            fourth_step: workflow.fourth_step || '',
+            fifth_step: workflow.fifth_step || ''
+        });
     };
 
     const handleSetCurrentWorkflow = async (id: string | number) => {
@@ -519,6 +561,14 @@ const SuperAdminPortal = () => {
                                                                 Set as Active
                                                             </Button>
                                                         )}
+                                                        <div className="flex gap-1">
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditWorkflow(w)}>
+                                                                <Edit className="w-4 h-4" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => handleDeleteWorkflow(w.id)}>
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -687,6 +737,64 @@ const SuperAdminPortal = () => {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddWorkflowOpen(false)}>Cancel</Button>
                         <Button onClick={handleCreateWorkflow} className="bg-destructive hover:bg-destructive/90">Create Workflow</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!editingWorkflow} onOpenChange={(open) => !open && setEditingWorkflow(null)}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader><DialogTitle>Edit Workflow #{editingWorkflow?.id}</DialogTitle></DialogHeader>
+                    <div className="space-y-6 py-4">
+                        <p className="text-sm text-muted-foreground">Modify the sequence of approval steps.</p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {[
+                                { id: 'first_step', label: '1st Step' },
+                                { id: 'second_step', label: '2nd Step' },
+                                { id: 'third_step', label: '3rd Step' },
+                                { id: 'fourth_step', label: '4th Step' },
+                                { id: 'fifth_step', label: '5th Step (Optional)' },
+                            ].map((step) => (
+                                <div key={step.id} className="space-y-2">
+                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{step.label}</Label>
+                                    <select
+                                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        value={(newWorkflowSteps as any)[step.id]}
+                                        onChange={(e) => setNewWorkflowSteps({ ...newWorkflowSteps, [step.id]: e.target.value })}
+                                    >
+                                        <option value="" disabled>Select Step</option>
+                                        <option value="supervisor">Supervisor Review</option>
+                                        <option value="faculty">Faculty Review (Dean)</option>
+                                        <option value="committee">Ethic Committee</option>
+                                        <option value="rectorate">Rectorate Approval</option>
+                                        <option value="done">Terminator (Done)</option>
+                                        <option value="">None / Skip</option>
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Workflow Preview</h4>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {[
+                                    newWorkflowSteps.first_step,
+                                    newWorkflowSteps.second_step,
+                                    newWorkflowSteps.third_step,
+                                    newWorkflowSteps.fourth_step,
+                                    newWorkflowSteps.fifth_step
+                                ].filter(Boolean).map((s, i, arr) => (
+                                    <React.Fragment key={i}>
+                                        <Badge variant="outline" className="bg-white capitalize py-1.5 px-3">{s}</Badge>
+                                        {i < arr.length - 1 && <ArrowRight className="w-3 h-3 text-slate-400" />}
+                                    </React.Fragment>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingWorkflow(null)}>Cancel</Button>
+                        <Button onClick={handleUpdateWorkflow} className="bg-destructive hover:bg-destructive/90">Update Workflow</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

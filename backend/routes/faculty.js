@@ -4,6 +4,30 @@ const pool = require('../db');
 const { verifyToken } = require('../middlewares/superAdminMiddelware');
 const { isAdminOrSuperAdmin } = require('../middlewares/adminOrSuperAdminMiddleware');
 
+// In-memory cache for faculties
+let facultiesCache = null;
+
+// Public route to fetch faculties (for Signup)
+router.get('/', async (req, res) => {
+  // Check cache first
+  if (facultiesCache) {
+    return res.json(facultiesCache);
+  }
+
+  console.time('FetchFacultiesDB');
+  try {
+    const result = await pool.query('SELECT * FROM faculties ORDER BY name ASC');
+    console.timeEnd('FetchFacultiesDB');
+
+    // Store in cache
+    facultiesCache = result.rows;
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching faculties:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Existing setFaculty route
 router.put('/setFaculty', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
   const { id, faculty_id } = req.body;
@@ -42,6 +66,10 @@ router.post('/', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
       'INSERT INTO faculties (name) VALUES ($1) RETURNING *',
       [faculty_name]
     );
+
+    // Invalidate cache
+    facultiesCache = null;
+
     res.status(201).json({
       message: 'Faculty added successfully',
       faculty: result.rows[0]
@@ -73,6 +101,9 @@ router.put('/:id', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
       return res.status(404).json({ message: 'Faculty not found' });
     }
 
+    // Invalidate cache
+    facultiesCache = null;
+
     res.json({
       message: 'Faculty updated successfully',
       faculty: result.rows[0]
@@ -95,6 +126,9 @@ router.delete('/:id', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Faculty not found' });
     }
+
+    // Invalidate cache
+    facultiesCache = null;
 
     res.json({ message: 'Faculty deleted successfully', faculty: result.rows[0] });
   } catch (err) {

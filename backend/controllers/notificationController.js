@@ -6,7 +6,7 @@ async function getUserNotifications(req, res) {
   const { user_id } = req.params;
   try {
     const result = await pool.query(
-      `SELECT * FROM notifications WHERE researcher_id = $1 ORDER BY created_at DESC`,
+      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC`,
       [user_id]
     );
     res.json(result.rows);

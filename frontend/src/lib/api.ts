@@ -107,8 +107,8 @@ export async function getAllApplications() {
 }
 
 // 9) Process Application (Approve/Reject)
-export async function processApplication(applicationId: string | number, action: string) {
-  return api.post('/api/process', { application_id: String(applicationId), action });
+export async function processApplication(applicationId: string | number, action: string, comment?: string) {
+  return api.post('/api/process', { application_id: String(applicationId), action, comment });
 }
 
 // 10) Update Application Status (Approve/Reject/Revision with comments)
@@ -146,6 +146,13 @@ export async function deleteFaculty(id: string | number) {
   return api.delete(`/api/faculty/${id}`);
 }
 
+// 12a) Public Faculty List (for Signup)
+export async function getPublicFaculties() {
+  return apiRequest<{ id: number; name: string }[]>('/api/faculty', {
+    method: 'GET'
+  });
+}
+
 // 13) Super Admin: Workflow Management
 export async function getWorkflows() {
   return api.get('/api/workflow');
@@ -159,6 +166,14 @@ export async function setCurrentWorkflow(id: string | number) {
   return api.put(`/api/workflow/${id}/set-current`);
 }
 
+export async function updateWorkflow(id: string | number, data: any) {
+  return api.put(`/api/workflow/${id}`, data);
+}
+
+export async function deleteWorkflow(id: string | number) {
+  return api.delete(`/api/workflow/${id}`);
+}
+
 // 14) User Role & Faculty Management
 export async function setUserRole(userId: string | number, roleId: string | number) {
   return api.put('/api/Role/setRole', { id: userId, role_id: roleId });
@@ -166,4 +181,13 @@ export async function setUserRole(userId: string | number, roleId: string | numb
 
 export async function setUserFaculty(userId: string | number, facultyId: string | number) {
   return api.put('/api/Role/setFaculty', { id: userId, faculty_id: facultyId });
+}
+
+// 15) Notifications
+export async function getUserNotifications(userId: string | number) {
+  return api.get(`/api/notifications/${userId}`);
+}
+
+export async function markNotificationAsRead(id: string | number) {
+  return api.patch(`/api/notifications/${id}/read`);
 }

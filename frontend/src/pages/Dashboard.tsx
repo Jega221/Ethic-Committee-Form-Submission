@@ -39,7 +39,7 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { getResearcherApplications } from '@/lib/api';
+import { getResearcherApplications, getUserNotifications, markNotificationAsRead } from '@/lib/api';
 import { Loader } from '@/components/ui/loader';
 
 const Dashboard = () => {
@@ -55,6 +55,13 @@ const Dashboard = () => {
   const [recentApps, setRecentApps] = useState<any[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Import API functions dynamically if not available in closure
+  // We'll trust they are available or imported at top
+  // Need to add imports for getUserNotifications, markNotificationAsRead to top of file
+
 
   useEffect(() => {
     const userProfile = localStorage.getItem("userProfile");
@@ -74,6 +81,7 @@ const Dashboard = () => {
         if (!profileStr) return;
         const user = JSON.parse(profileStr);
 
+        // 1. Fetch Applications
         const res = await getResearcherApplications(user.id);
         const apps = res.data;
 
@@ -92,8 +100,7 @@ const Dashboard = () => {
         ).slice(0, 5);
         setRecentApps(sorted);
 
-        // Chart Data (Mocking history based on current data for visual effect)
-        // Group by month
+        // Chart Data
         const monthlyData: any = {};
         apps.forEach((a: any) => {
           const date = new Date(a.submission_date);
@@ -116,6 +123,16 @@ const Dashboard = () => {
           { name: 'Rejected', value: apps.length - (counts.approved + counts.pending + counts.revision), color: '#ef4444' }
         ].filter(d => d.value > 0));
 
+        // 2. Fetch Notifications
+        try {
+          const notifRes = await getUserNotifications(user.id);
+          const notifs = notifRes.data;
+          setNotifications(notifs);
+          setUnreadCount(notifs.filter((n: any) => !n.is_read).length);
+        } catch (err) {
+          console.error("Failed to load notifications", err);
+        }
+
       } catch (error) {
         console.error("Dashboard data fetch failed", error);
       } finally {
@@ -125,6 +142,16 @@ const Dashboard = () => {
 
     fetchData();
   }, []);
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await markNotificationAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     const s = status.toLowerCase();
@@ -166,12 +193,55 @@ const Dashboard = () => {
               </div>
 
               <div className="flex items-center gap-3">
-                <button className="relative p-2 hover:bg-slate-100 rounded-full transition-colors">
-                  <Bell className="w-5 h-5 text-slate-600" />
-                  <span className="absolute top-2 right-2 bg-destructive text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                    2
-                  </span>
-                </button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative p-2 hover:bg-slate-100 rounded-full transition-colors outline-none">
+                      <Bell className="w-5 h-5 text-slate-600" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-2 right-2 bg-destructive text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 p-0">
+                    <DropdownMenuLabel className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between">
+                        <span>Notifications</span>
+                        <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notif: any) => (
+                          <DropdownMenuItem
+                            key={notif.id}
+                            className={`p-4 border-b border-border last:border-0 cursor-pointer ${!notif.is_read ? 'bg-muted/50' : ''}`}
+                            onClick={() => handleMarkAsRead(notif.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-1 p-1.5 rounded-full ${notif.is_read ? 'bg-slate-100' : 'bg-blue-100'}`}>
+                                <Bell className={`w-3 h-3 ${notif.is_read ? 'text-slate-500' : 'text-blue-600'}`} />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <p className={`text-sm ${!notif.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                  {notif.message}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(notif.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </header>
