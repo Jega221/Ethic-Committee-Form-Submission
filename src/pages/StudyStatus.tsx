@@ -13,12 +13,19 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 
+interface Document {
+  type: string;
+  fileName: string;
+  fileData?: string;
+  fileType?: string;
+}
+
 interface SubmittedApplication {
   id: string;
   title: string;
   submissionDate: string;
   status: string;
-  documents: { type: string; fileName: string }[];
+  documents: Document[];
   // Extended fields from form
   applicantName?: string;
   email?: string;
@@ -65,6 +72,42 @@ export default function StudyStatus() {
     }
   }, []);
 
+  const handleViewDocument = (doc: Document) => {
+    if (doc.fileData) {
+      const newWindow = window.open();
+      if (newWindow) {
+        if (doc.fileType?.startsWith('image/')) {
+          newWindow.document.write(`<html><head><title>${doc.fileName}</title></head><body style="margin:0;display:flex;justify-content:center;align-items:center;min-height:100vh;background:#f0f0f0;"><img src="${doc.fileData}" style="max-width:100%;max-height:100vh;" /></body></html>`);
+        } else if (doc.fileType === 'application/pdf') {
+          newWindow.document.write(`<html><head><title>${doc.fileName}</title></head><body style="margin:0;"><iframe src="${doc.fileData}" style="width:100%;height:100vh;border:none;"></iframe></body></html>`);
+        } else {
+          newWindow.document.write(`<html><head><title>${doc.fileName}</title></head><body style="margin:0;"><iframe src="${doc.fileData}" style="width:100%;height:100vh;border:none;"></iframe></body></html>`);
+        }
+        newWindow.document.close();
+      }
+    } else {
+      alert('File data not available. This submission was made before file storage was enabled. Please submit a new application.');
+    }
+  };
+
+  const handleDownloadDocument = (doc: Document) => {
+    if (doc.fileData) {
+      const link = document.createElement('a');
+      link.href = doc.fileData;
+      link.download = doc.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert('File data not available. This submission was made before file storage was enabled. Please submit a new application.');
+    }
+  };
+
+  const clearOldSubmissions = () => {
+    localStorage.removeItem('submittedApplications');
+    setApplications([]);
+  };
+
   const latestApplication = applications[applications.length - 1];
   const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.status) : 0;
 
@@ -97,13 +140,7 @@ export default function StudyStatus() {
                 </Card>
 
                 {/* Submission Info Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="border-border/50 shadow-sm">
-                    <CardContent className="p-5">
-                      <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">Submission ID</p>
-                      <p className="text-foreground text-lg font-semibold font-mono">{latestApplication.id}</p>
-                    </CardContent>
-                  </Card>
+                <div className="mb-8">
                   <Card className="border-border/50 shadow-sm">
                     <CardContent className="p-5">
                       <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">Research Title</p>
@@ -111,38 +148,6 @@ export default function StudyStatus() {
                     </CardContent>
                   </Card>
                 </div>
-
-                {/* Uploaded Files */}
-                <Card className="mb-8 border-border/50 shadow-sm">
-                  <CardContent className="p-5">
-                    <h2 className="text-primary font-semibold mb-4 flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Uploaded Documents
-                    </h2>
-                    <div className="space-y-3">
-                      {latestApplication.documents.length > 0 ? (
-                        latestApplication.documents.map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary/10 rounded">
-                                <FileText className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="text-foreground font-medium text-sm">{doc.fileName}</p>
-                                <p className="text-muted-foreground text-xs">{doc.type}</p>
-                              </div>
-                            </div>
-                            <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80">
-                              <Download className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-muted-foreground text-sm">No documents uploaded</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
 
                 {/* Status Badge */}
                 <div className="flex justify-center mb-6">
@@ -236,7 +241,7 @@ export default function StudyStatus() {
                 </div>
 
                 {/* Action Button */}
-                <div className="flex justify-center">
+                <div className="flex justify-center mb-8">
                   <Button 
                     variant="outline" 
                     size="lg"
@@ -247,6 +252,62 @@ export default function StudyStatus() {
                     View Submission
                   </Button>
                 </div>
+
+                {/* Uploaded Files */}
+                <Card className="mb-8 border-border/50 shadow-sm">
+                  <CardContent className="p-5">
+                    <h2 className="text-primary font-semibold mb-4 flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Uploaded Documents
+                    </h2>
+                    <div className="space-y-3">
+                      {latestApplication.documents.length > 0 ? (
+                        latestApplication.documents.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary/10 rounded">
+                                <FileText className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="text-foreground font-medium text-sm">{doc.fileName}</p>
+                                <p className="text-muted-foreground text-xs">{doc.type}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary hover:text-primary/80"
+                                onClick={() => handleViewDocument(doc)}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="text-primary hover:text-primary/80"
+                                onClick={() => handleDownloadDocument(doc)}
+                              >
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No documents uploaded</p>
+                      )}
+                      
+                      {latestApplication.documents.length > 0 && !latestApplication.documents[0]?.fileData && (
+                        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                          <p className="text-sm text-warning-foreground">
+                            <strong>Note:</strong> This submission was made before file storage was enabled. 
+                            View/Download may not work. Please submit a new application for full functionality.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
 
                 {/* View Submission Modal */}
                 <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
