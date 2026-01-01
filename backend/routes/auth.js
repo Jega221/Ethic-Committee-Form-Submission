@@ -8,7 +8,7 @@ const router = express.Router();
 
 //  Signup route
 router.post('/signup', async (req, res) => {
-  const { name, surname, role_id=1, email, password } = req.body;
+  const { name, surname, email, password } = req.body; // removed role_id
 
   try {
     // check if user exists
@@ -20,47 +20,113 @@ router.post('/signup', async (req, res) => {
     // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // insert new user
+    // insert new user (no role handling here)
     const newUser = await pool.query(
-      'INSERT INTO users (name,surname, email, password,role_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name,surname, email, role_id',
-      [name, surname, email, hashedPassword, role_id]
+      'INSERT INTO users (name,surname, email, password) VALUES ($1, $2, $3, $4) RETURNING id, name, surname, email',
+      [name, surname, email, hashedPassword]
     );
 
-    // generate JWT
-    const token = jwt.sign({ id: newUser.rows[0].id, email , role:newUser.rows[0].role_id}, process.env.JWT_SECRET, {
+    // generate JWT (no role)
+    const token = jwt.sign({ id: newUser.rows[0].id, email: newUser.rows[0].email }, process.env.JWT_SECRET, {
       expiresIn: '1h',
     });
 
-    res.json({ token, user: { id: newUser.rows[0].id, name: newUser.rows[0].name, email: newUser.rows[0].email, role: newUser.rows[0].role_id } });
+    res.json({ token, user: { id: newUser.rows[0].id, name: newUser.rows[0].name, email: newUser.rows[0].email } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-//  Login route
+// Login route
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const userResult = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    // 1️⃣ Find user
+    const userResult = await pool.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+
     if (userResult.rows.length === 0)
       return res.status(400).json({ message: 'Email not found' });
 
     const user = userResult.rows[0];
 
-    // compare password
+    // 2️⃣ Compare password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch)
       return res.status(400).json({ message: 'Invalid password' });
 
-    // generate token
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role_id }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
+    // 3️⃣ Fetch all roles for this user
+    const rolesResult = await pool.query(
+      `
+      SELECT r.role_name
+      FROM user_roles ur
+      JOIN roles r ON r.id = ur.role_id
+      WHERE ur.user_id = $1
+      `,
+      [user.id]
+    );
+
+    const roles = rolesResult.rows.map(r => r.role_name); // ['ADMIN', 'COMMITTEE', ...]
+
+    // 4️⃣ Generate JWT with roles array
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        roles: roles
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // 5️⃣ Response
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        roles: roles
+      }
     });
 
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role_id } });
-    console.log(`id: ${user.id} name :${user.name} has logged in`);
+    console.log(`id: ${user.id} name: ${user.name} logged in`);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Forgot password route
+router.post('/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    // Look up user; do not reveal existence in response for security
+    const userResult = await pool.query('SELECT id, email FROM users WHERE email = $1', [email]);
+
+    if (userResult.rows.length === 0) {
+      // Generic response to avoid user enumeration
+      return res.json({ message: 'If an account with that email exists, a reset token has been sent.' });
+    }
+
+    const user = userResult.rows[0];
+
+    // Create a short-lived reset token. Replace sending logic with real email service.
+    const resetToken = jwt.sign(
+      { id: user.id, email: user.email, purpose: 'password_reset' },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' }
+    );
+
+    // TODO: send `resetToken` to user's email via your email service
+    // For now we return token (remove this in production)
+    res.json({ message: 'Password reset token generated', resetToken });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
