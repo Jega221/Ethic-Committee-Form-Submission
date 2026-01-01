@@ -72,4 +72,41 @@ router.put('/setRole', verifyToken, isSuperAdmin, async (req, res) => {
   }
 });
 
+// Add new role endpoint
+router.post('/roles', verifyToken, isSuperAdmin, async (req, res) => {
+  const { name} = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'role name is required' });
+  }
+
+  try {
+    // Prevent duplicate role names
+    const exists = await pool.query(
+      'SELECT id FROM roles WHERE name = $1',
+      [name]
+    );
+
+    if (exists.rows.length > 0) {
+      return res.status(400).json({ message: 'Role already exists' });
+    }
+
+    // Insert role
+    const insertRes = await pool.query(
+      `INSERT INTO roles (name)
+       VALUES ($1)
+       RETURNING id, name`,
+      [name]
+    );
+
+    res.status(201).json({
+      message: 'Role created successfully',
+      role: insertRes.rows[0]
+    });
+  } catch (err) {
+    console.error('Create role error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
