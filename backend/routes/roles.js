@@ -83,7 +83,7 @@ router.post('/roles', verifyToken, isSuperAdmin, async (req, res) => {
   try {
     // Prevent duplicate role names
     const exists = await pool.query(
-      'SELECT id FROM roles WHERE name = $1',
+      'SELECT id FROM roles WHERE role_name = $1',
       [name]
     );
 
@@ -93,9 +93,9 @@ router.post('/roles', verifyToken, isSuperAdmin, async (req, res) => {
 
     // Insert role
     const insertRes = await pool.query(
-      `INSERT INTO roles (name)
+      `INSERT INTO roles (role_name)
        VALUES ($1)
-       RETURNING id, name`,
+       RETURNING id, role_name`,
       [name]
     );
 
