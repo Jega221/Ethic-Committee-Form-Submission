@@ -32,6 +32,33 @@ const researchSchema = z.object({
   startDate: z.string().min(1, "Start date is required"),
   endDate: z.string().min(1, "End date is required"),
   fundingSource: z.string().trim().min(1, "Funding source is required").max(200),
+}).refine((data) => {
+  // Validate start date is not in the past
+  if (data.startDate) {
+    const selectedDate = new Date(data.startDate + 'T00:00:00');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (selectedDate < today) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Start date cannot be in the past",
+  path: ["startDate"],
+}).refine((data) => {
+  // Validate end date is after start date
+  if (data.startDate && data.endDate) {
+    const end = new Date(data.endDate + 'T00:00:00');
+    const start = new Date(data.startDate + 'T00:00:00');
+    if (end <= start) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "End date must be after start date",
+  path: ["endDate"],
 });
 
 const participantsSchema = z.object({
@@ -121,10 +148,46 @@ const NewApplicationContent = () => {
   });
 
   const [unlockedTabs, setUnlockedTabs] = useState<string[]>(['applicant']);
+  const [dateErrors, setDateErrors] = useState({
+    startDate: '',
+    endDate: '',
+  });
 
+  // Auto-fill user information from localStorage
   useEffect(() => {
     setOpen(false);
+    
+    // Load user profile and auto-fill form
+    const userProfile = localStorage.getItem('userProfile');
+    if (userProfile) {
+      try {
+        const parsed = JSON.parse(userProfile);
+        setApplicantData(prev => ({
+          ...prev,
+          firstName: parsed.firstName || parsed.name || '',
+          lastName: parsed.surname || '',
+          email: parsed.email || '',
+          department: parsed.faculty || '', // Use faculty name for department
+        }));
+      } catch (err) {
+        console.error('Error parsing user profile:', err);
+      }
+    }
   }, [setOpen]);
+
+  // Get today's date in YYYY-MM-DD format for date inputs
+  const getTodayDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  // Get minimum end date (start date or today, whichever is later)
+  const getMinEndDate = () => {
+    if (researchData.startDate) {
+      return researchData.startDate;
+    }
+    return getTodayDate();
+  };
 
   const handleFileChange = (field: keyof typeof documentFiles) => (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -180,8 +243,82 @@ const NewApplicationContent = () => {
     validateAndProceed('applicant', 'research', applicantSchema, applicantData);
   };
 
+  const validateDates = () => {
+    const errors = { startDate: '', endDate: '' };
+    let hasErrors = false;
+
+    // Validate start date
+    if (!researchData.startDate) {
+      errors.startDate = 'Start date is required';
+      hasErrors = true;
+    } else {
+      const startDate = new Date(researchData.startDate + 'T00:00:00');
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      if (startDate < today) {
+        errors.startDate = 'Start date cannot be in the past';
+        hasErrors = true;
+      }
+    }
+
+    // Validate end date
+    if (!researchData.endDate) {
+      errors.endDate = 'End date is required';
+      hasErrors = true;
+    } else if (researchData.startDate) {
+      const endDate = new Date(researchData.endDate + 'T00:00:00');
+      const startDate = new Date(researchData.startDate + 'T00:00:00');
+      if (endDate <= startDate) {
+        errors.endDate = 'End date must be after start date';
+        hasErrors = true;
+      }
+    }
+
+    setDateErrors(errors);
+    return !hasErrors;
+  };
+
   const handleResearchNext = () => {
-    validateAndProceed('research', 'participants', researchSchema, researchData);
+    // First validate dates
+    const datesValid = validateDates();
+    
+    if (!datesValid) {
+      toast({
+        title: "Date Validation Error",
+        description: "Please fix the date errors before proceeding",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Then validate with schema (but skip date validation in schema since we already did it)
+    try {
+      // Create a schema without date validation for the basic check
+      const basicSchema = z.object({
+        projectTitle: z.string().trim().min(1, "Project title is required").max(200),
+        projectDescription: z.string().trim().min(50, "Description must be at least 50 characters").max(2000),
+        researchType: z.string().min(1, "Research type is required"),
+        startDate: z.string().min(1, "Start date is required"),
+        endDate: z.string().min(1, "End date is required"),
+        fundingSource: z.string().trim().min(1, "Funding source is required").max(200),
+      });
+      
+      basicSchema.parse(researchData);
+      
+      // If validation passes, proceed
+      setActiveTab('participants');
+      if (!unlockedTabs.includes('participants')) {
+        setUnlockedTabs([...unlockedTabs, 'participants']);
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast({
+          title: "Validation Error",
+          description: error.errors[0].message,
+          variant: "destructive",
+        });
+      }
+    }
   };
 
   const handleParticipantsNext = () => {
@@ -193,22 +330,32 @@ const NewApplicationContent = () => {
   };
 
   const handleDocumentsNext = () => {
-    const requiredDocs = ['informedConsent', 'researchProtocol', 'dataCollection'] as const;
-    const missingDocs = requiredDocs.filter(doc => !documentFiles[doc]);
+    // Count uploaded documents
+    const uploadedDocs = Object.values(documentFiles).filter(file => file !== null);
+    const uploadedCount = uploadedDocs.length;
 
-    if (missingDocs.length > 0) {
+    // Require at least 5 documents
+    if (uploadedCount < 5) {
       const docNames: Record<string, string> = {
         informedConsent: 'Informed Consent Form',
         researchProtocol: 'Research Protocol or Proposal',
         dataCollection: 'Data Collection Instruments',
+        institutionalApprovals: 'Institutional Approvals',
+        otherDocuments: 'Other Documents',
       };
+      
+      const missingDocs = Object.entries(documentFiles)
+        .filter(([_, file]) => !file)
+        .map(([key, _]) => docNames[key as keyof typeof docNames]);
+
       toast({
-        title: "Validation Error",
-        description: `Please upload: ${missingDocs.map(d => docNames[d]).join(', ')}`,
+        title: "Document Upload Required",
+        description: `You must upload at least 5 documents. Missing: ${missingDocs.join(', ')} (${uploadedCount}/5 uploaded)`,
         variant: "destructive",
       });
       return;
     }
+
     setActiveTab('submit');
     if (!unlockedTabs.includes('submit')) {
       setUnlockedTabs([...unlockedTabs, 'submit']);
@@ -420,6 +567,8 @@ const NewApplicationContent = () => {
                       value={applicantData.firstName}
                       onChange={(e) => setApplicantData({ ...applicantData, firstName: e.target.value })}
                       required
+                      readOnly
+                      className="bg-muted cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-2">
@@ -430,6 +579,8 @@ const NewApplicationContent = () => {
                       value={applicantData.lastName}
                       onChange={(e) => setApplicantData({ ...applicantData, lastName: e.target.value })}
                       required
+                      readOnly
+                      className="bg-muted cursor-not-allowed"
                     />
                   </div>
                 </div>
@@ -444,6 +595,8 @@ const NewApplicationContent = () => {
                       value={applicantData.email}
                       onChange={(e) => setApplicantData({ ...applicantData, email: e.target.value })}
                       required
+                      readOnly
+                      className="bg-muted cursor-not-allowed"
                     />
                   </div>
                   <div className="space-y-2">
@@ -461,23 +614,14 @@ const NewApplicationContent = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="department">Department *</Label>
-                    <Select
+                    <Label htmlFor="department">Faculty/Department *</Label>
+                    <Input
+                      id="department"
                       value={applicantData.department}
-                      onValueChange={(value) => setApplicantData({ ...applicantData, department: value })}
+                      readOnly
+                      className="bg-muted cursor-not-allowed"
                       required
-                    >
-                      <SelectTrigger id="department">
-                        <SelectValue placeholder="Select department" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="psychology">Psychology</SelectItem>
-                        <SelectItem value="biology">Biology</SelectItem>
-                        <SelectItem value="medicine">Medicine</SelectItem>
-                        <SelectItem value="sociology">Sociology</SelectItem>
-                        <SelectItem value="engineering">Engineering</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="position">Position *</Label>
@@ -573,9 +717,38 @@ const NewApplicationContent = () => {
                       id="startDate"
                       type="date"
                       value={researchData.startDate}
-                      onChange={(e) => setResearchData({ ...researchData, startDate: e.target.value })}
+                      onChange={(e) => {
+                        const selectedDate = e.target.value;
+                        setResearchData({ ...researchData, startDate: selectedDate });
+                        // Clear error when user changes date
+                        setDateErrors(prev => ({ ...prev, startDate: '' }));
+                        // If end date is before new start date, clear it and show error
+                        if (researchData.endDate && selectedDate && researchData.endDate <= selectedDate) {
+                          setResearchData(prev => ({ ...prev, endDate: '' }));
+                          setDateErrors(prev => ({ ...prev, endDate: 'End date must be after start date' }));
+                        }
+                      }}
+                      onBlur={() => {
+                        // Validate on blur
+                        if (researchData.startDate) {
+                          const startDate = new Date(researchData.startDate);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          if (startDate < today) {
+                            setDateErrors(prev => ({ ...prev, startDate: 'Start date cannot be in the past' }));
+                          }
+                        }
+                      }}
+                      min={getTodayDate()}
                       required
+                      className={dateErrors.startDate ? 'border-destructive focus-visible:ring-destructive' : ''}
                     />
+                    {dateErrors.startDate && (
+                      <p className="text-xs text-destructive">{dateErrors.startDate}</p>
+                    )}
+                    {!dateErrors.startDate && (
+                      <p className="text-xs text-muted-foreground">Start date cannot be in the past</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="endDate">Expected End Date *</Label>
@@ -583,9 +756,35 @@ const NewApplicationContent = () => {
                       id="endDate"
                       type="date"
                       value={researchData.endDate}
-                      onChange={(e) => setResearchData({ ...researchData, endDate: e.target.value })}
+                      onChange={(e) => {
+                        setResearchData({ ...researchData, endDate: e.target.value });
+                        // Clear error when user changes date
+                        setDateErrors(prev => ({ ...prev, endDate: '' }));
+                      }}
+                      onBlur={() => {
+                        // Validate on blur
+                        if (researchData.endDate && researchData.startDate) {
+                          const endDate = new Date(researchData.endDate);
+                          const startDate = new Date(researchData.startDate);
+                          if (endDate <= startDate) {
+                            setDateErrors(prev => ({ ...prev, endDate: 'End date must be after start date' }));
+                          }
+                        }
+                      }}
+                      min={getMinEndDate()}
                       required
+                      className={dateErrors.endDate ? 'border-destructive focus-visible:ring-destructive' : ''}
                     />
+                    {dateErrors.endDate && (
+                      <p className="text-xs text-destructive">{dateErrors.endDate}</p>
+                    )}
+                    {!dateErrors.endDate && (
+                      <p className="text-xs text-muted-foreground">
+                        {!researchData.startDate 
+                          ? 'Please select start date first' 
+                          : 'End date must be after start date'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -799,13 +998,18 @@ const NewApplicationContent = () => {
                 Supporting Documents
               </h2>
               <p className="text-muted-foreground mb-6">
-                Upload all required documents related to your research study. All fields marked with * are mandatory.
+                Upload all required documents related to your research study. All 5 documents are mandatory.
               </p>
 
               <div className="bg-primary/5 rounded-lg p-4 border border-primary/20 mb-8">
-                <h3 className="text-primary font-semibold mb-2">Document Requirements</h3>
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-primary font-semibold">Document Requirements</h3>
+                  <span className={`text-sm font-medium ${Object.values(documentFiles).filter(f => f !== null).length >= 5 ? 'text-green-600' : 'text-destructive'}`}>
+                    {Object.values(documentFiles).filter(f => f !== null).length}/5 documents uploaded
+                  </span>
+                </div>
                 <p className="text-sm text-primary">
-                  Please upload each required document in the designated field below. Accepted formats: PDF, DOC, DOCX (Maximum 10MB per file)
+                  Please upload all 5 required documents in the designated fields below. Accepted formats: PDF, DOC, DOCX (Maximum 10MB per file)
                 </p>
               </div>
 
@@ -926,7 +1130,7 @@ const NewApplicationContent = () => {
 
                 {/* 4. Institutional Approvals */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-foreground">4. Institutional Approvals (If Applicable)</h3>
+                  <h3 className="font-semibold text-foreground">4. Institutional Approvals <span className="text-destructive">*</span></h3>
                   <p className="text-sm text-muted-foreground">Upload any institutional approval documents if required for your research</p>
                   <input
                     ref={fileInputRefs.institutionalApprovals}
@@ -964,7 +1168,7 @@ const NewApplicationContent = () => {
 
                 {/* 5. Any Other Relevant Documentation */}
                 <div className="space-y-3">
-                  <h3 className="font-semibold text-foreground">5. Any Other Relevant Documentation</h3>
+                  <h3 className="font-semibold text-foreground">5. Any Other Relevant Documentation <span className="text-destructive">*</span></h3>
                   <p className="text-sm text-muted-foreground">Upload any additional documents that support your application</p>
                   <input
                     ref={fileInputRefs.otherDocuments}
@@ -1021,9 +1225,12 @@ const NewApplicationContent = () => {
                   <Button
                     type="button"
                     onClick={handleDocumentsNext}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    disabled={Object.values(documentFiles).filter(f => f !== null).length < 5}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Next: Review & Submit
+                    {Object.values(documentFiles).filter(f => f !== null).length < 5 
+                      ? `Upload ${5 - Object.values(documentFiles).filter(f => f !== null).length} more document(s)` 
+                      : 'Next: Review & Submit'}
                   </Button>
                 </div>
               </div>

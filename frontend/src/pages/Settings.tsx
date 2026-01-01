@@ -7,31 +7,218 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { updateProfile, changePassword, getPublicFaculties } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const Settings = () => {
+  const { toast } = useToast();
   const [profile, setProfile] = useState({
     firstName: '',
     surname: '',
     email: '',
     faculty: '',
+    faculty_id: null as number | null,
   });
 
+  const [editForm, setEditForm] = useState({
+    name: '',
+    surname: '',
+    email: '',
+    faculty_id: null as number | null,
+  });
+
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  const [faculties, setFaculties] = useState<{ id: number; name: string }[]>([]);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Load user profile from localStorage on mount
   useEffect(() => {
-    const savedProfile = localStorage.getItem('userProfile');
-    if (savedProfile) {
-      const parsed = JSON.parse(savedProfile);
-      setProfile({
-        firstName: parsed.firstName || '',
-        surname: parsed.surname || '',
-        email: parsed.email || '',
-        faculty: parsed.faculty || '',
-      });
-    }
+    const loadProfile = () => {
+      const savedProfile = localStorage.getItem('userProfile');
+      if (savedProfile) {
+        try {
+          const parsed = JSON.parse(savedProfile);
+          console.log('Loaded profile from localStorage:', parsed);
+          setProfile({
+            firstName: parsed.firstName || parsed.name || '',
+            surname: parsed.surname || '',
+            email: parsed.email || '',
+            faculty: parsed.faculty || '',
+            faculty_id: parsed.faculty_id || null,
+          });
+          // Initialize edit form
+          setEditForm({
+            name: parsed.firstName || parsed.name || '',
+            surname: parsed.surname || '',
+            email: parsed.email || '',
+            faculty_id: parsed.faculty_id || null,
+          });
+        } catch (err) {
+          console.error('Error parsing user profile:', err);
+        }
+      }
+    };
+    loadProfile();
   }, []);
+
+  // Load faculties
+  useEffect(() => {
+    const loadFaculties = async () => {
+      try {
+        const data = await getPublicFaculties();
+        setFaculties(data);
+      } catch (err) {
+        console.error('Failed to load faculties:', err);
+      }
+    };
+    loadFaculties();
+  }, []);
+
+  const handleEditProfile = async () => {
+    if (!editForm.name || !editForm.email) {
+      toast({
+        title: "Error",
+        description: "Name and email are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('Updating profile with data:', editForm);
+      const response = await updateProfile({
+        name: editForm.name,
+        surname: editForm.surname,
+        email: editForm.email,
+        faculty_id: editForm.faculty_id || undefined,
+      });
+
+      console.log('Profile update response:', response);
+
+      // Update local storage
+      const currentProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
+      const updatedProfile = {
+        ...currentProfile,
+        name: response.data.user.name,
+        firstName: response.data.user.firstName || response.data.user.name,
+        surname: response.data.user.surname,
+        email: response.data.user.email,
+        faculty_id: response.data.user.faculty_id,
+        faculty: response.data.user.faculty,
+      };
+      localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+      console.log('Updated profile in localStorage:', updatedProfile);
+
+      // Update state
+      setProfile({
+        firstName: updatedProfile.firstName || updatedProfile.name,
+        surname: updatedProfile.surname,
+        email: updatedProfile.email,
+        faculty: updatedProfile.faculty || '',
+        faculty_id: updatedProfile.faculty_id,
+      });
+
+      // Also update edit form to reflect changes
+      setEditForm({
+        name: updatedProfile.firstName || updatedProfile.name,
+        surname: updatedProfile.surname,
+        email: updatedProfile.email,
+        faculty_id: updatedProfile.faculty_id,
+      });
+
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+
+      setIsEditDialogOpen(false);
+    } catch (err: any) {
+      console.error('Profile update error:', err);
+      console.error('Error response:', err.response);
+      const errorMessage = err.response?.data?.message || err.response?.data?.error || err.message || "Failed to update profile";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!passwordForm.currentPassword || !passwordForm.newPassword || !passwordForm.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "All password fields are required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast({
+        title: "Error",
+        description: "New passwords do not match",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (passwordForm.newPassword.length < 6) {
+      toast({
+        title: "Error",
+        description: "Password must be at least 6 characters",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      console.log('Changing password...');
+      const response = await changePassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      
+      console.log('Password change response:', response);
+
+      toast({
+        title: "Success",
+        description: "Password changed successfully",
+      });
+
+      // Reset form
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+      });
+
+      setIsPasswordDialogOpen(false);
+    } catch (err: any) {
+      console.error('Password change error:', err);
+      console.error('Error response:', err.response);
+      const errorMessage = err.response?.data?.message || err.message || "Failed to change password";
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -146,23 +333,59 @@ const Settings = () => {
                         </DialogHeader>
                         <div className="grid grid-cols-2 gap-4 pt-4">
                           <div className="space-y-2">
-                            <Label htmlFor="firstName">First Name</Label>
-                            <Input id="firstName" defaultValue={profile.firstName} />
+                            <Label htmlFor="firstName">First Name *</Label>
+                            <Input 
+                              id="firstName" 
+                              value={editForm.name}
+                              onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                              required
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="surname">Surname</Label>
-                            <Input id="surname" defaultValue={profile.surname} />
+                            <Input 
+                              id="surname" 
+                              value={editForm.surname}
+                              onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
-                            <Input id="email" type="email" defaultValue={profile.email} />
+                            <Label htmlFor="email">Email *</Label>
+                            <Input 
+                              id="email" 
+                              type="email" 
+                              value={editForm.email}
+                              onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                              required
+                            />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="faculty">Faculty</Label>
-                            <Input id="faculty" defaultValue={profile.faculty} />
+                            <Select
+                              value={editForm.faculty_id?.toString() || ''}
+                              onValueChange={(value) => setEditForm({ ...editForm, faculty_id: value ? parseInt(value) : null })}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select faculty" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="">None</SelectItem>
+                                {faculties.map((faculty) => (
+                                  <SelectItem key={faculty.id} value={faculty.id.toString()}>
+                                    {faculty.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
-                        <Button className="w-full mt-4">Save Changes</Button>
+                        <Button 
+                          className="w-full mt-4" 
+                          onClick={handleEditProfile}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
                       </DialogContent>
                     </Dialog>
 
@@ -176,19 +399,43 @@ const Settings = () => {
                         </DialogHeader>
                         <div className="space-y-4 pt-4">
                           <div className="space-y-2">
-                            <Label htmlFor="currentPassword">Current Password</Label>
-                            <Input id="currentPassword" type="password" />
+                            <Label htmlFor="currentPassword">Current Password *</Label>
+                            <Input 
+                              id="currentPassword" 
+                              type="password" 
+                              value={passwordForm.currentPassword}
+                              onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                              required
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="newPassword">New Password</Label>
-                            <Input id="newPassword" type="password" />
+                            <Label htmlFor="newPassword">New Password *</Label>
+                            <Input 
+                              id="newPassword" 
+                              type="password" 
+                              value={passwordForm.newPassword}
+                              onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                              required
+                            />
                           </div>
                           <div className="space-y-2">
-                            <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                            <Input id="confirmPassword" type="password" />
+                            <Label htmlFor="confirmPassword">Confirm New Password *</Label>
+                            <Input 
+                              id="confirmPassword" 
+                              type="password" 
+                              value={passwordForm.confirmPassword}
+                              onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                              required
+                            />
                           </div>
                         </div>
-                        <Button className="w-full mt-4">Update Password</Button>
+                        <Button 
+                          className="w-full mt-4" 
+                          onClick={handleChangePassword}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? 'Updating...' : 'Update Password'}
+                        </Button>
                       </DialogContent>
                     </Dialog>
                   </div>

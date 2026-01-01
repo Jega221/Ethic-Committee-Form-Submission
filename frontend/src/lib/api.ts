@@ -191,3 +191,12 @@ export async function getUserNotifications(userId: string | number) {
 export async function markNotificationAsRead(id: string | number) {
   return api.patch(`/api/notifications/${id}/read`);
 }
+
+// 16) User Profile & Security
+export async function updateProfile(data: { name?: string, surname?: string, email?: string, faculty_id?: number }) {
+  return api.put('/api/auth/profile', data);
+}
+
+export async function changePassword(data: { currentPassword: string, newPassword: string }) {
+  return api.put('/api/auth/change-password', data);
+}

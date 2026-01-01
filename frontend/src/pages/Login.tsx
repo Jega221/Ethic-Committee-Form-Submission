@@ -33,6 +33,22 @@ const Login = () => {
         }
       );
 
+      // Ensure role is set - if missing, try to decode from token
+      if (!data.user.role && data.token) {
+        try {
+          const tokenParts = data.token.split('.');
+          if (tokenParts.length === 3) {
+            const payload = JSON.parse(atob(tokenParts[1]));
+            data.user.role = payload.role;
+            data.user.role_id = payload.role;
+            console.log('Role decoded from token:', payload.role);
+          }
+        } catch (e) {
+          console.error('Failed to decode role from token:', e);
+        }
+      }
+
+      console.log('Login response - user data:', data.user);
       localStorage.setItem("token", data.token);
       localStorage.setItem("userProfile", JSON.stringify(data.user));
 
