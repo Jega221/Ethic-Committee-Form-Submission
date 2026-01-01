@@ -58,30 +58,47 @@ router.put('/:id/set-current', verifyToken, isSuperAdmin, async (req, res) => {
 // CREATE new workflow (protected, no duplicates)
 // -------------------------------
 router.post('/', verifyToken, isSuperAdmin, async (req, res) => {
-  const { first_step, second_step, third_step, fourth_step, fifth_step } = req.body;
+  const { steps } = req.body;
+
+  if (!Array.isArray(steps) || steps.length === 0) {
+    return res.status(400).json({ error: 'Steps must be a non-empty array' });
+  }
 
   try {
-    // 1. Check for duplicate workflow (all steps match)
+    /* ----------------------------------
+       1. Validate steps exist in roles
+    ----------------------------------- */
+    const rolesResult = await pool.query(
+      `SELECT role_name FROM roles WHERE role_name = ANY($1::text[])`,
+      [steps]
+    );
+
+    if (rolesResult.rows.length !== steps.length) {
+      return res.status(400).json({
+        error: 'One or more steps do not exist in roles table'
+      });
+    }
+
+    /* ----------------------------------
+       2. Prevent duplicate workflows
+    ----------------------------------- */
     const duplicateCheck = await pool.query(
-      `SELECT * FROM workflow 
-       WHERE first_step IS NOT DISTINCT FROM $1
-         AND second_step IS NOT DISTINCT FROM $2
-         AND third_step IS NOT DISTINCT FROM $3
-         AND fourth_step IS NOT DISTINCT FROM $4
-         AND fifth_step IS NOT DISTINCT FROM $5`,
-      [first_step, second_step, third_step, fourth_step, fifth_step]
+      `SELECT id FROM workflow WHERE steps = $1::text[]`,
+      [steps]
     );
 
     if (duplicateCheck.rows.length > 0) {
       return res.status(400).json({ error: 'Duplicate workflow exists' });
     }
 
-    // 2. Insert new workflow
+    /* ----------------------------------
+       3. Insert workflow
+    ----------------------------------- */
     const insertResult = await pool.query(
-      `INSERT INTO workflow (first_step, second_step, third_step, fourth_step, fifth_step)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO workflow (steps)
+       VALUES ($1::text[])
        RETURNING *`,
-      [first_step, second_step, third_step, fourth_step, fifth_step]
+      [steps]
     );
 
     res.status(201).json({
