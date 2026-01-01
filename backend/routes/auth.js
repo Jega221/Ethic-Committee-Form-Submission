@@ -133,4 +133,76 @@ router.post('/forgot-password', async (req, res) => {
   }
 });
 
+// Add JWT auth middleware
+function authenticateToken(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ message: 'No token provided' });
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, payload) => {
+    if (err) return res.status(401).json({ message: 'Invalid token' });
+    req.user = payload; // { id, email, roles, ... }
+    next();
+  });
+}
+
+// Profile modification endpoint
+router.put('/profile', authenticateToken, async (req, res) => {
+  const { name, surname, email, password } = req.body;
+  const userId = req.user && req.user.id;
+
+  if (!userId) return res.status(401).json({ message: 'Unauthorized' });
+
+  try {
+    // If email provided, ensure it's not used by another user
+    if (email) {
+      const emailCheck = await pool.query('SELECT id FROM users WHERE email = $1 AND id <> $2', [email, userId]);
+      if (emailCheck.rows.length > 0) return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    // Build dynamic update
+    const fields = [];
+    const values = [];
+    let idx = 1;
+
+    if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
+    if (surname !== undefined) { fields.push(`surname = $${idx++}`); values.push(surname); }
+    if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email); }
+    if (password !== undefined) {
+      const hashed = await bcrypt.hash(password, 10);
+      fields.push(`password = $${idx++}`);
+      values.push(hashed);
+    }
+
+    if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
+
+    values.push(userId);
+    const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, surname, email`;
+    const updateRes = await pool.query(query, values);
+
+    const updated = updateRes.rows[0];
+
+    // Fetch roles to include in new token/response
+    const rolesRes = await pool.query(
+      `SELECT r.role_name
+       FROM user_roles ur
+       JOIN roles r ON r.id = ur.role_id
+       WHERE ur.user_id = $1`,
+      [updated.id]
+    );
+    const roles = rolesRes.rows.map(r => r.role_name);
+
+    // Regenerate token with roles
+    const token = jwt.sign({ id: updated.id, email: updated.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({
+      token,
+      user: { id: updated.id, name: updated.name, surname: updated.surname, email: updated.email, roles }
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 module.exports = router;
