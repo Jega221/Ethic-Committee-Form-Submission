@@ -1,56 +1,110 @@
-//backend/routes/roles.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verifyToken } = require('../middlewares/superAdminMiddelware');
-const { isAdminOrSuperAdmin } = require('../middlewares/adminOrSuperAdminMiddleware');
+const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware');
 
-router.put('/setRole', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-  const { id, role_id } = req.body;
+router.put('/setRole', verifyToken, isSuperAdmin, async (req, res) => {
+  const { user_id, role_id } = req.body;
+
+  if (!user_id || !role_id) {
+    return res.status(400).json({ message: 'user_id and role_id are required' });
+  }
 
   try {
-    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    if (existing.rows.length === 0)
-      return res.status(400).json({ message: 'Users does not exists' });
+    /* ---------------------------
+       1. Check user exists
+    ---------------------------- */
+    const userRes = await pool.query(
+      'SELECT id FROM users WHERE id = $1',
+      [user_id]
+    );
 
+    if (userRes.rows.length === 0) {
+      return res.status(404).json({ message: 'User does not exist' });
+    }
 
-    const result = await pool.query(
-      `UPDATE users SET role_id = $1 WHERE id = $2`, [role_id, id]
+    /* ---------------------------
+       2. Check role exists
+    ---------------------------- */
+    const roleRes = await pool.query(
+      'SELECT id FROM roles WHERE id = $1',
+      [role_id]
+    );
+
+    if (roleRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Role does not exist' });
+    }
+
+    /* ---------------------------
+       3. Prevent duplicate
+    ---------------------------- */
+    const exists = await pool.query(
+      `
+      SELECT 1 FROM user_roles
+      WHERE user_id = $1 AND role_id = $2
+      `,
+      [user_id, role_id]
+    );
+
+    if (exists.rows.length > 0) {
+      return res.status(400).json({ message: 'User already has this role' });
+    }
+
+    /* ---------------------------
+       4. Assign role
+    ---------------------------- */
+    await pool.query(
+      `
+      INSERT INTO user_roles (user_id, role_id)
+      VALUES ($1, $2)
+      `
+      ,
+      [user_id, role_id]
     );
 
     res.status(201).json({
-      message: 'role assaign successful',
-      admin: result.rows[0],
+      message: 'Role assigned successfully'
     });
+
   } catch (err) {
-    console.error('role assaignement error:', err);
+    console.error('Role assignment error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Set Faculty
-router.put('/setFaculty', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-  const { id, faculty_id } = req.body;
+// Add new role endpoint
+router.post('/roles', verifyToken, isSuperAdmin, async (req, res) => {
+  const { name} = req.body;
+
+  if (!name) {
+    return res.status(400).json({ message: 'role name is required' });
+  }
 
   try {
-    // Check if user exists
-    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    if (existing.rows.length === 0)
-      return res.status(400).json({ message: 'User does not exist' });
+    // Prevent duplicate role names
+    const exists = await pool.query(
+      'SELECT id FROM roles WHERE role_name = $1',
+      [name]
+    );
 
-    // Update faculty
-    const result = await pool.query(
-      `UPDATE users SET faculty_id = $1 WHERE id = $2 RETURNING *`,
-      [faculty_id, id]
+    if (exists.rows.length > 0) {
+      return res.status(400).json({ message: 'Role already exists' });
+    }
+
+    // Insert role
+    const insertRes = await pool.query(
+      `INSERT INTO roles (role_name)
+       VALUES ($1)
+       RETURNING id, role_name`,
+      [name]
     );
 
     res.status(201).json({
-      message: 'Faculty assignment successful',
-      user: result.rows[0],
+      message: 'Role created successfully',
+      role: insertRes.rows[0]
     });
-
   } catch (err) {
-    console.error('Faculty assignment error:', err);
+    console.error('Create role error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
