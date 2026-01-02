@@ -1,7 +1,6 @@
 import { CheckCircle, FileText, Download, Calendar, MessageSquare, Eye, User, BookOpen, Users, Shield } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
-import { getResearcherApplications, API_BASE_URL } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,16 +12,21 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Loader } from '@/components/ui/loader';
-import { DocumentViewer } from '@/components/DocumentViewer';
+import { getResearcherApplications, API_BASE_URL } from '@/lib/api';
+
+interface Document {
+  type: string;
+  fileName: string;
+  fileData?: string;
+  fileType?: string;
+}
 
 interface SubmittedApplication {
   id: string;
   title: string;
   submissionDate: string;
-  status: string; // The application status (e.g. Pending, Approved)
-  currentStep?: string; // The workflow step (e.g. supervisor, faculty)
-  documents?: { type: string; fileName: string; url: string }[];
+  status: string;
+  documents: Document[];
   applicantName?: string;
   email?: string;
   faculty?: string;
@@ -37,25 +41,19 @@ interface SubmittedApplication {
 }
 
 const statusSteps = [
-  { key: 'supervisor', label: 'Supervisor Review', color: 'bg-success' },
+  { key: 'submitted', label: 'Submitted', color: 'bg-success' },
   { key: 'faculty', label: 'Faculty Review', color: 'bg-info' },
   { key: 'committee', label: 'Committee Review', color: 'bg-warning' },
-  { key: 'rectorate', label: 'Rectorate Decision', color: 'bg-primary' },
+  { key: 'dean', label: 'Dean Decision', color: 'bg-primary' },
 ];
 
-const getStatusIndex = (step: string): number => {
-  const s = (step || '').toLowerCase();
-  if (s === 'done' || s === 'approved') return 3; // Finished
-
-  const index = statusSteps.findIndex(x => x.key === s);
-  return index >= 0 ? index : 0;
-};
-
-const calcProgressPercent = (index: number) => {
-  const maxIndex = Math.max(statusSteps.length - 1, 1);
-  const clamped = Math.max(0, Math.min(index, maxIndex));
-  // Total span is 75% (from 12.5% to 87.5%)
-  return (clamped / maxIndex) * 75;
+const getStatusIndex = (status: string): number => {
+  const s = (status || '').toLowerCase();
+  if (s.includes('faculty')) return 1;
+  if (s.includes('committee') || s.includes('ethics')) return 2;
+  if (s.includes('dean')) return 3;
+  if (s.includes('approved') || s.includes('final')) return 4;
+  return 0;
 };
 
 const getExpectedDecisionDate = (submissionDate: string): string => {
@@ -64,98 +62,172 @@ const getExpectedDecisionDate = (submissionDate: string): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 };
 
-const getStatusColor = (status: string) => {
-  const s = status.toLowerCase();
-  if (['approved', 'accepted'].some(k => s.includes(k))) return 'bg-success text-success-foreground';
-  if (['rejected', 'declined'].some(k => s.includes(k))) return 'bg-destructive text-destructive-foreground';
-  if (s.includes('pending') || s.includes('review') || s.includes('submitted')) return 'bg-amber-500 text-white'; // Amber for pending
-  return 'bg-secondary text-secondary-foreground';
-};
-
 export default function StudyStatus() {
   const [applications, setApplications] = useState<SubmittedApplication[]>([]);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
-  const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
-  const [currentDocument, setCurrentDocument] = useState<{ url: string; name: string; type: string } | null>(null);
-
-  /* API Integration */
+  const [currentDoc, setCurrentDoc] = useState<Document | null>(null);
+  const [isDocModalOpen, setIsDocModalOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchApplications = async () => {
+    const load = async () => {
+      // Try backend first, fall back to localStorage
       try {
         const profileStr = localStorage.getItem('userProfile');
         if (!profileStr) {
-          console.warn("No userProfile found in localStorage");
+          // load from localStorage only
+          const saved = localStorage.getItem('submittedApplications');
+          if (saved) setApplications(JSON.parse(saved));
           setLoading(false);
           return;
         }
-        const userProfile = JSON.parse(profileStr);
-        if (userProfile && userProfile.id) {
-          const res = await getResearcherApplications(userProfile.id);
-          // Map API response to UI model if needed. 
-          const mappedApps = res.data.map((app: any) => ({
-            id: String(app.application_id), // Use backend ID
-            title: app.title,
-            status: app.status, // e.g. "Pending", "Faculty Review"
-            currentStep: app.current_step, // Map backend step
-            submissionDate: new Date(app.submission_date).toLocaleDateString(),
-            documents: (app.documents || []).map((doc: any) => ({
-              type: doc.file_type || 'Document',
-              fileName: doc.file_name || 'Unknown',
-              url: doc.file_url
-            })).filter((d: any) => d.fileName)
-          }));
 
-          setApplications(mappedApps);
-        } else {
-          console.error("User ID not found in userProfile", userProfile);
+        const user = JSON.parse(profileStr);
+        if (!user?.id) {
+          const saved = localStorage.getItem('submittedApplications');
+          if (saved) setApplications(JSON.parse(saved));
+          setLoading(false);
+          return;
         }
+
+        const res = await getResearcherApplications(user.id);
+        const mapped = (res.data || []).map((app: any) => {
+          const docs = (app.documents || []).map((d: any) => {
+            const url = d.file_url || d.url || d.path || null;
+            const fileData = url ? `${API_BASE_URL}/${url}` : undefined;
+            return {
+              type: d.file_type || d.type || 'Document',
+              fileName: d.file_name || d.name || 'Document',
+              fileData,
+              fileType: d.mime_type || d.file_mime || undefined,
+            } as Document;
+          });
+
+          return {
+            id: String(app.application_id || app.id || ''),
+            title: app.title || app.research_title || 'Untitled Research',
+            submissionDate: app.submission_date || app.created_at || new Date().toISOString(),
+            status: app.status || app.current_step || 'Submitted',
+            documents: docs,
+            applicantName: `${app.first_name || app.name || ''} ${app.surname || ''}`.trim(),
+            email: app.email,
+            faculty: app.faculty_name || app.faculty,
+            researchType: app.research_type,
+            startDate: app.start_date,
+            endDate: app.end_date,
+            fundingSource: app.funding_source,
+            participantCount: app.participant_count,
+            vulnerablePopulations: app.vulnerable_populations,
+            riskLevel: app.risk_level,
+            dataProtection: app.data_protection,
+          } as SubmittedApplication;
+        });
+
+        setApplications(mapped);
+        // persist a client-side copy for offline/viewing older submissions
+        try { localStorage.setItem('submittedApplications', JSON.stringify(mapped)); } catch {}
       } catch (err) {
-        console.error(err);
+        // fall back to localStorage
+        const saved = localStorage.getItem('submittedApplications');
+        if (saved) setApplications(JSON.parse(saved));
+        console.error('Failed to load applications from backend', err);
       } finally {
         setLoading(false);
       }
     };
-    fetchApplications();
+
+    load();
   }, []);
 
-  const latestApplication = applications.length > 0 ? applications[applications.length - 1] : null;
-  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.currentStep || '') : 0;
-  const progressPercent = calcProgressPercent(currentStatusIndex);
+  // show file in-app (same window) using modal viewer
+  const handleViewDocument = (doc: Document) => {
+    if (doc.fileData) {
+      setCurrentDoc(doc);
+      setIsDocModalOpen(true);
+    } else {
+      // eslint-disable-next-line no-alert
+      alert('File data not available. This submission was made before file storage was enabled. Please submit a new application.');
+    }
+  };
 
-  // Get user profile for additional info
+  const handleDownloadDocument = (doc: Document) => {
+    if (doc.fileData) {
+      const link = document.createElement('a');
+      link.href = doc.fileData;
+      link.download = doc.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      // eslint-disable-next-line no-alert
+      alert('File data not available. This submission was made before file storage was enabled. Please submit a new application.');
+    }
+  };
+
+  const clearOldSubmissions = () => {
+    localStorage.removeItem('submittedApplications');
+    setApplications([]);
+  };
+
+  const latestApplication = applications[applications.length - 1];
+  const currentStatusIndex = latestApplication ? getStatusIndex(latestApplication.status) : 0;
+
   const userProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
 
-  if (loading) {
-    return (
-      <SidebarProvider>
-        <div className="flex h-screen w-full bg-background">
-          <DashboardSidebar />
-          <main className="flex-1 flex items-center justify-center">
-            <Loader />
-          </main>
-        </div>
-      </SidebarProvider>
-    );
-  }
+  // helper to pick badge classes for status
+  const getStatusBadgeClass = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('approved') || s.includes('final')) {
+      return 'px-6 py-2.5 bg-success text-success-foreground rounded-full text-sm font-semibold shadow-md';
+    }
+    if (s.includes('reject') || s.includes('rejected')) {
+      return 'px-6 py-2.5 bg-destructive text-destructive-foreground rounded-full text-sm font-semibold shadow-md';
+    }
+    // treat submitted/faculty/committee/pending as pending (orange)
+    if (s.includes('pending') || s.includes('submitted') || s.includes('faculty') || s.includes('committee') || s.includes('ethics')) {
+      return 'px-6 py-2.5 bg-warning text-warning-foreground rounded-full text-sm font-semibold shadow-md';
+    }
+    return 'px-6 py-2.5 bg-muted text-muted-foreground rounded-full text-sm font-semibold shadow-md';
+  };
+
+  // smaller pill used inside dialog/modal
+  const getStatusPillClass = (status: string) => {
+    const s = (status || '').toLowerCase();
+    if (s.includes('approved') || s.includes('final')) {
+      return 'px-4 py-1.5 bg-success text-success-foreground rounded-full text-sm font-medium';
+    }
+    if (s.includes('reject') || s.includes('rejected')) {
+      return 'px-4 py-1.5 bg-destructive text-destructive-foreground rounded-full text-sm font-medium';
+    }
+    if (s.includes('pending') || s.includes('submitted') || s.includes('faculty') || s.includes('committee') || s.includes('ethics')) {
+      return 'px-4 py-1.5 bg-warning text-warning-foreground rounded-full text-sm font-medium';
+    }
+    return 'px-4 py-1.5 bg-muted text-muted-foreground rounded-full text-sm font-medium';
+  };
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-background">
+      <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
-        <main className="flex-1 overflow-y-auto w-full">
-          <div className="p-8 max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-foreground tracking-tight">Study Status</h1>
-                <p className="text-muted-foreground mt-2">Track the progress of your ethics committee application</p>
-              </div>
-            </div>
+        <main className="flex-1 p-6 md:p-8">
+          <SidebarTrigger className="mb-6" />
 
-            {latestApplication ? (
+          <div className="max-w-5xl">
+            <h1 className="text-foreground text-lg font-semibold tracking-wide uppercase mb-6">
+              Submission Status
+            </h1>
+
+            {loading ? (
+              <Card className="border-border/50">
+                <CardContent className="text-center py-16">
+                  <div className="p-4 bg-muted rounded-full w-fit mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-foreground font-semibold text-lg mb-2">Loading submissions...</h3>
+                </CardContent>
+              </Card>
+            ) : latestApplication ? (
               <>
-                {/* Success Alert */}
                 <Card className="mb-6 border-success/30 bg-success/5">
                   <CardContent className="flex items-center gap-3 p-4">
                     <div className="p-2 rounded-full bg-success/10">
@@ -165,14 +237,7 @@ export default function StudyStatus() {
                   </CardContent>
                 </Card>
 
-                {/* Submission Info Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <Card className="border-border/50 shadow-sm">
-                    <CardContent className="p-5">
-                      <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">Submission ID</p>
-                      <p className="text-foreground text-lg font-semibold font-mono">{latestApplication.id}</p>
-                    </CardContent>
-                  </Card>
+                <div className="mb-8">
                   <Card className="border-border/50 shadow-sm">
                     <CardContent className="p-5">
                       <p className="text-muted-foreground text-xs uppercase tracking-wide mb-2">Research Title</p>
@@ -181,97 +246,30 @@ export default function StudyStatus() {
                   </Card>
                 </div>
 
-                {/* Uploaded Files */}
-                <Card className="mb-8 border-border/50 shadow-sm">
-                  <CardContent className="p-5">
-                    <h2 className="text-primary font-semibold mb-4 flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      Uploaded Documents
-                    </h2>
-                    <div className="space-y-3">
-                      {latestApplication.documents && latestApplication.documents.length > 0 ? (
-                        latestApplication.documents.map((doc, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-primary/10 rounded">
-                                <FileText className="w-4 h-4 text-primary" />
-                              </div>
-                              <div>
-                                <p className="text-foreground font-medium text-sm">{doc.fileName}</p>
-                                <p className="text-muted-foreground text-xs">{doc.type}</p>
-                              </div>
-                            </div>
-                            <div className="flex gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary hover:text-primary/80"
-                                onClick={() => {
-                                  setCurrentDocument({
-                                    url: `${API_BASE_URL}/${doc.url}`,
-                                    name: doc.fileName,
-                                    type: doc.type
-                                  });
-                                  setDocumentViewerOpen(true);
-                                }}
-                                title="View document"
-                              >
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-primary hover:text-primary/80"
-                                onClick={() => {
-                                  const link = document.createElement('a');
-                                  link.href = `${API_BASE_URL}/${doc.url}`;
-                                  link.download = doc.fileName;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                }}
-                                title="Download document"
-                              >
-                                <Download className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-muted-foreground text-sm">No documents uploaded</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Status Badge */}
                 <div className="flex justify-center mb-6">
-                  <span className={`px-6 py-2.5 rounded-full text-sm font-semibold shadow-md ${getStatusColor(latestApplication.status)}`}>
+                  <span className={getStatusBadgeClass(latestApplication.status)}>
                     {latestApplication.status}
                   </span>
                 </div>
 
-                {/* Progress Steps */}
                 <Card className="mb-8 border-border/50 shadow-sm">
                   <CardContent className="p-6">
                     <div className="flex items-center justify-between relative">
-                      {/* Connecting Line - Background */}
-                      <div className="absolute top-5 left-[12.5%] right-[12.5%] h-1 bg-muted rounded-full" />
-                      {/* Connecting Line - Progress */}
+                      <div className="absolute top-5 left-[10%] right-[10%] h-1 bg-muted rounded-full" />
                       <div
-                        className="absolute top-5 left-[12.5%] h-1 bg-success rounded-full transition-all duration-500"
-                        style={{ width: `${progressPercent}%` }}
+                        className="absolute top-5 left-[10%] h-1 bg-success rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(currentStatusIndex * 26.67, 80)}%` }}
                       />
-
                       {statusSteps.map((step, index) => (
                         <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
                           <div
-                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${index < currentStatusIndex
-                              ? 'bg-success border-success text-success-foreground'
-                              : index === currentStatusIndex
+                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${
+                              index < currentStatusIndex
+                                ? 'bg-success border-success text-success-foreground'
+                                : index === currentStatusIndex
                                 ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
                                 : 'bg-muted border-muted-foreground/30 text-muted-foreground'
-                              }`}
+                            }`}
                           >
                             {index < currentStatusIndex ? (
                               <CheckCircle className="w-5 h-5" />
@@ -279,12 +277,13 @@ export default function StudyStatus() {
                               <span className="text-sm font-semibold">{index + 1}</span>
                             )}
                           </div>
-                          <span className={`text-xs mt-3 text-center font-medium ${index < currentStatusIndex
-                            ? 'text-success'
-                            : index === currentStatusIndex
-                              ? 'text-destructive'
+                          <span className={`text-xs mt-3 text-center font-medium ${
+                            index < currentStatusIndex 
+                              ? 'text-success' 
+                              : index === currentStatusIndex 
+                              ? 'text-destructive' 
                               : 'text-muted-foreground'
-                            }`}>
+                          }`}>
                             {step.label}
                           </span>
                           {index === currentStatusIndex && (
@@ -296,7 +295,6 @@ export default function StudyStatus() {
                   </CardContent>
                 </Card>
 
-                {/* Info Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                   <Card className="border-border/50 shadow-sm">
                     <CardContent className="p-5">
@@ -306,7 +304,7 @@ export default function StudyStatus() {
                         </div>
                         <h3 className="text-foreground font-semibold">Submitted</h3>
                       </div>
-                      <p className="text-muted-foreground text-sm">{latestApplication.submissionDate}</p>
+                      <p className="text-muted-foreground text-sm">{new Date(latestApplication.submissionDate).toLocaleDateString()}</p>
                     </CardContent>
                   </Card>
                   <Card className="border-border/50 shadow-sm">
@@ -333,8 +331,7 @@ export default function StudyStatus() {
                   </Card>
                 </div>
 
-                {/* Action Button */}
-                <div className="flex justify-center">
+                <div className="flex justify-center mb-8">
                   <Button
                     variant="outline"
                     size="lg"
@@ -346,7 +343,51 @@ export default function StudyStatus() {
                   </Button>
                 </div>
 
-                {/* View Submission Modal */}
+                <Card className="mb-8 border-border/50 shadow-sm">
+                  <CardContent className="p-5">
+                    <h2 className="text-primary font-semibold mb-4 flex items-center gap-2">
+                      <FileText className="w-5 h-5" />
+                      Uploaded Documents
+                    </h2>
+                    <div className="space-y-3">
+                      {latestApplication.documents.length > 0 ? (
+                        latestApplication.documents.map((doc, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 bg-primary/10 rounded">
+                                <FileText className="w-4 h-4 text-primary" />
+                              </div>
+                              <div>
+                                <p className="text-foreground font-medium text-sm">{doc.fileName}</p>
+                                <p className="text-muted-foreground text-xs">{doc.type}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" onClick={() => handleViewDocument(doc)}>
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-primary hover:text-primary/80" onClick={() => handleDownloadDocument(doc)}>
+                                <Download className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-muted-foreground text-sm">No documents uploaded</p>
+                      )}
+
+                      {latestApplication.documents.length > 0 && !latestApplication.documents[0]?.fileData && (
+                        <div className="mt-4 p-3 bg-warning/10 border border-warning/30 rounded-lg">
+                          <p className="text-sm text-warning-foreground">
+                            <strong>Note:</strong> This submission was made before file storage was enabled.
+                            View/Download may not work. Please submit a new application for full functionality.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Dialog open={isViewModalOpen} onOpenChange={setIsViewModalOpen}>
                   <DialogContent className="max-w-3xl max-h-[90vh]">
                     <DialogHeader>
@@ -358,18 +399,16 @@ export default function StudyStatus() {
 
                     <ScrollArea className="max-h-[70vh] pr-4">
                       <div className="space-y-6">
-                        {/* Header Info */}
                         <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                           <div>
                             <p className="text-xs text-muted-foreground uppercase">Reference Number</p>
                             <p className="text-lg font-mono font-semibold text-foreground">{latestApplication.id}</p>
                           </div>
-                          <span className={`px-4 py-1.5 rounded-full text-sm font-medium ${getStatusColor(latestApplication.status)}`}>
+                          <span className={getStatusPillClass(latestApplication.status)}>
                             {latestApplication.status}
                           </span>
                         </div>
 
-                        {/* Applicant Information */}
                         <div>
                           <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                             <User className="w-4 h-4 text-primary" />
@@ -401,7 +440,6 @@ export default function StudyStatus() {
 
                         <Separator />
 
-                        {/* Research Information */}
                         <div>
                           <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                             <BookOpen className="w-4 h-4 text-primary" />
@@ -435,7 +473,6 @@ export default function StudyStatus() {
 
                         <Separator />
 
-                        {/* Participants */}
                         <div>
                           <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                             <Users className="w-4 h-4 text-primary" />
@@ -455,7 +492,6 @@ export default function StudyStatus() {
 
                         <Separator />
 
-                        {/* Ethics & Data Protection */}
                         <div>
                           <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                             <Shield className="w-4 h-4 text-primary" />
@@ -475,14 +511,13 @@ export default function StudyStatus() {
 
                         <Separator />
 
-                        {/* Documents */}
                         <div>
                           <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                             <FileText className="w-4 h-4 text-primary" />
                             Uploaded Documents
                           </h3>
                           <div className="space-y-2">
-                            {latestApplication.documents && latestApplication.documents.length > 0 ? (
+                            {latestApplication.documents.length > 0 ? (
                               latestApplication.documents.map((doc, index) => (
                                 <div key={index} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                                   <div className="flex items-center gap-3">
@@ -492,40 +527,9 @@ export default function StudyStatus() {
                                       <p className="text-muted-foreground text-xs">{doc.type}</p>
                                     </div>
                                   </div>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-primary"
-                                      onClick={() => {
-                                        setCurrentDocument({
-                                          url: `${API_BASE_URL}/${doc.url}`,
-                                          name: doc.fileName,
-                                          type: doc.type
-                                        });
-                                        setDocumentViewerOpen(true);
-                                      }}
-                                      title="View document"
-                                    >
-                                      <Eye className="w-4 h-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="text-primary"
-                                      onClick={() => {
-                                        const link = document.createElement('a');
-                                        link.href = `${API_BASE_URL}/${doc.url}`;
-                                        link.download = doc.fileName;
-                                        document.body.appendChild(link);
-                                        link.click();
-                                        document.body.removeChild(link);
-                                      }}
-                                      title="Download document"
-                                    >
-                                      <Download className="w-4 h-4" />
-                                    </Button>
-                                  </div>
+                                  <Button variant="ghost" size="sm" className="text-primary" onClick={() => handleDownloadDocument(doc)}>
+                                    <Download className="w-4 h-4" />
+                                  </Button>
                                 </div>
                               ))
                             ) : (
@@ -535,6 +539,26 @@ export default function StudyStatus() {
                         </div>
                       </div>
                     </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Document viewer modal (in-app) */}
+                <Dialog open={isDocModalOpen} onOpenChange={setIsDocModalOpen}>
+                  <DialogContent className="max-w-4xl max-h-[90vh]">
+                    <DialogHeader>
+                      <DialogTitle className="text-lg font-semibold">View Document</DialogTitle>
+                    </DialogHeader>
+                    <div className="h-[70vh]">
+                      {currentDoc?.fileType?.startsWith('image/') ? (
+                        <img src={currentDoc.fileData} alt={currentDoc.fileName} className="max-h-full mx-auto" />
+                      ) : currentDoc?.fileType === 'application/pdf' ? (
+                        <iframe src={currentDoc.fileData} title={currentDoc.fileName} className="w-full h-full border-none" />
+                      ) : currentDoc?.fileData ? (
+                        <iframe src={currentDoc.fileData} title={currentDoc.fileName} className="w-full h-full border-none" />
+                      ) : (
+                        <div className="p-6">No preview available</div>
+                      )}
+                    </div>
                   </DialogContent>
                 </Dialog>
               </>
@@ -552,20 +576,6 @@ export default function StudyStatus() {
           </div>
         </main>
       </div>
-
-      {/* Document Viewer */}
-      {currentDocument && (
-        <DocumentViewer
-          isOpen={documentViewerOpen}
-          onClose={() => {
-            setDocumentViewerOpen(false);
-            setCurrentDocument(null);
-          }}
-          documentUrl={currentDocument.url}
-          documentName={currentDocument.name}
-          documentType={currentDocument.type}
-        />
-      )}
     </SidebarProvider>
   );
 }
