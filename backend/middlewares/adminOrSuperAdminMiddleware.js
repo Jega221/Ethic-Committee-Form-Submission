@@ -7,7 +7,7 @@ const isAdminOrSuperAdmin = (req, res, next) => {
         return res.status(401).json({ message: 'Unauthorized' });
     }
 
-    const role = req.user.role;
+    const role = (req.user && req.user.role) ? String(req.user.role).toLowerCase().replace(/[- ]+/g, '_').trim() : null;
     if (role === 'admin' || role === 'super_admin') {
         return next();
     }

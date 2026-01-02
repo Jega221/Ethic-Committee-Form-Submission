@@ -7,6 +7,9 @@ require('dotenv').config();
 
 const router = express.Router();
 
+// Helper to normalize role strings (consistent with frontend)
+const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_').trim();
+
 // Signup route
 router.post('/signup', async (req, res) => {
   const { name, surname, email, password } = req.body; // removed role_id
@@ -71,29 +74,15 @@ router.post('/login', async (req, res) => {
       [user.id]
     );
 
-    const roles = rolesResult.rows.map(r => r.role_name); // ['ADMIN', 'COMMITTEE', ...]
+    // Normalize role names to lowercase underscored form for consistency
+    const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_').trim();
+    const roles = rolesResult.rows.map(r => normalizeRole(r.role_name)); // ['admin', 'committee_member', ...]
 
     // 4️⃣ Generate JWT with roles array
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-        roles: roles
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '1h' }
-    );
+    const token = jwt.sign({ id: user.id, email: user.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // 5️⃣ Response
-    res.json({
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        roles: roles
-      }
-    });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, roles } });
 
     console.log(`id: ${user.id} name: ${user.name} logged in`);
 
@@ -191,7 +180,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
        WHERE ur.user_id = $1`,
       [updated.id]
     );
-    const roles = rolesRes.rows.map(r => r.role_name);
+    const roles = rolesRes.rows.map(r => normalizeRole(r.role_name));
 
     // Regenerate token with roles
     const token = jwt.sign({ id: updated.id, email: updated.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });

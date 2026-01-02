@@ -4,6 +4,8 @@ const router = express.Router();
 const pool = require('../db');
 const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware');
 
+const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_').trim();
+
 /**
  * USERS - Fetch all users with role and faculty names
  */
@@ -32,8 +34,8 @@ router.get('/users', verifyToken, async (req, res) => {
     `;
     const users = (await pool.query(query)).rows.map(u => ({
       ...u,
-      // ensure roles is always an array of strings
-      roles: Array.isArray(u.roles) ? u.roles : []
+      // ensure roles is always an array of strings and normalized
+      roles: Array.isArray(u.roles) ? u.roles.map(r => normalizeRole(r)) : []
     }));
     res.json(users);
   } catch (err) {
