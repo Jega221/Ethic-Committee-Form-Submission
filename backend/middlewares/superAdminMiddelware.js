@@ -13,6 +13,11 @@ const verifyToken = (req, res, next) => {
       console.error('JWT Verification Error (getData.js flow):', err.message, 'Secret:', process.env.JWT_SECRET ? 'Present' : 'Missing');
       return res.status(403).json({ message: `JWT_VERIFY_FAIL: ${err.message}` });
     }
+    // Normalize decoded token: support both `role` (singular) and `roles` (array)
+    if (decoded && Array.isArray(decoded.roles) && decoded.roles.length > 0) {
+      // set a singular `role` field for backward compatibility
+      decoded.role = decoded.role || decoded.roles[0];
+    }
 
     req.user = decoded;
     next();

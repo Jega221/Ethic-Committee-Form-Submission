@@ -1,0 +1,61 @@
+// Backup of original roles.js
+// Created automatically before replacing with user-provided implementation
+
+const express = require('express');
+const router = express.Router();
+const pool = require('../db');
+const { verifyToken } = require('../middlewares/superAdminMiddelware');
+const { isAdminOrSuperAdmin } = require('../middlewares/adminOrSuperAdminMiddleware');
+
+router.put('/setRole', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+  const { id, role_id } = req.body;
+
+  try {
+    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0)
+      return res.status(400).json({ message: 'Users does not exists' });
+
+
+    const result = await pool.query(
+      `UPDATE users SET role_id = $1 WHERE id = $2`, [role_id, id]
+    );
+
+    res.status(201).json({
+      message: 'role assaign successful',
+      admin: result.rows[0],
+    });
+  } catch (err) {
+    console.error('role assaignement error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Set Faculty
+router.put('/setFaculty', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
+  const { id, faculty_id } = req.body;
+
+  try {
+    // Check if user exists
+    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (existing.rows.length === 0)
+      return res.status(400).json({ message: 'User does not exist' });
+
+    // Update faculty
+    const result = await pool.query(
+      `UPDATE users SET faculty_id = $1 WHERE id = $2 RETURNING *`,
+      [faculty_id, id]
+    );
+
+    res.status(201).json({
+      message: 'Faculty assignment successful',
+      user: result.rows[0],
+    });
+
+  } catch (err) {
+    console.error('Faculty assignment error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+module.exports = router;
+// backup of original roles.js

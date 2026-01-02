@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../db'); //pg Pool connection
-const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware'); // your middleware
+const pool = require('../db');
+require('dotenv').config();
+const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware');
 
-// -------------------------------
 // GET all workflows (protected)
-// -------------------------------
 router.get('/', verifyToken, isSuperAdmin, async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM workflow ORDER BY id ASC');
@@ -16,37 +15,20 @@ router.get('/', verifyToken, isSuperAdmin, async (req, res) => {
   }
 });
 
-// -------------------------------
-// UPDATE workflow status to 'current' (protected)
-// Only one workflow can be 'current'
-// -------------------------------
+// Set a workflow as current (transactional)
 router.put('/:id/set-current', verifyToken, isSuperAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    await pool.query('BEGIN'); // start transaction
-
-    // 1. Set all workflows to 'no_in_use'
-    await pool.query(`UPDATE workflow SET status = 'no_in_use' WHERE status = 'current'`);
-
-    // 2. Set the selected workflow to 'current'
-    const updateResult = await pool.query(
-      `UPDATE workflow SET status = 'current' WHERE id = $1 RETURNING *`,
-      [id]
-    );
-
+    await pool.query('BEGIN');
+    await pool.query("UPDATE workflow SET status = 'no_in_use' WHERE status = 'current'");
+    const updateResult = await pool.query('UPDATE workflow SET status = $1 WHERE id = $2 RETURNING *', ['current', id]);
     if (updateResult.rows.length === 0) {
       await pool.query('ROLLBACK');
       return res.status(404).json({ error: 'Workflow not found' });
     }
-
     await pool.query('COMMIT');
-
-    res.json({
-      message: 'Workflow set to current successfully',
-      workflow: updateResult.rows[0]
-    });
-
+    res.json({ message: 'Workflow set to current successfully', workflow: updateResult.rows[0] });
   } catch (err) {
     await pool.query('ROLLBACK');
     console.error(err.message);
@@ -54,101 +36,66 @@ router.put('/:id/set-current', verifyToken, isSuperAdmin, async (req, res) => {
   }
 });
 
-// -------------------------------
-// CREATE new workflow (protected, no duplicates)
-// -------------------------------
+// Create new workflow (steps is a text[])
 router.post('/', verifyToken, isSuperAdmin, async (req, res) => {
-  const { first_step, second_step, third_step, fourth_step, fifth_step } = req.body;
+  const { name, steps } = req.body; // steps should be an array of role names
+
+  if (!Array.isArray(steps) || steps.length === 0) return res.status(400).json({ message: 'steps must be a non-empty array' });
 
   try {
-    // 1. Check for duplicate workflow (all steps match)
-    const duplicateCheck = await pool.query(
-      `SELECT * FROM workflow 
-       WHERE first_step IS NOT DISTINCT FROM $1
-         AND second_step IS NOT DISTINCT FROM $2
-         AND third_step IS NOT DISTINCT FROM $3
-         AND fourth_step IS NOT DISTINCT FROM $4
-         AND fifth_step IS NOT DISTINCT FROM $5`,
-      [first_step, second_step, third_step, fourth_step, fifth_step]
-    );
-
-    if (duplicateCheck.rows.length > 0) {
-      return res.status(400).json({ error: 'Duplicate workflow exists' });
+    // Validate each step exists as a role
+    const roleNames = steps;
+    const rolesRes = await pool.query('SELECT role_name FROM roles WHERE role_name = ANY($1)', [roleNames]);
+    if (rolesRes.rows.length !== roleNames.length) {
+      return res.status(400).json({ message: 'One or more steps reference non-existent roles' });
     }
 
-    // 2. Insert new workflow
-    const insertResult = await pool.query(
-      `INSERT INTO workflow (first_step, second_step, third_step, fourth_step, fifth_step)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [first_step, second_step, third_step, fourth_step, fifth_step]
-    );
+    // Check duplicate by exact steps array
+    const dup = await pool.query('SELECT * FROM workflow WHERE steps = $1', [steps]);
+    if (dup.rows.length > 0) return res.status(400).json({ message: 'Duplicate workflow exists' });
 
-    res.status(201).json({
-      message: 'Workflow created successfully',
-      workflow: insertResult.rows[0]
-    });
-
+    const insert = await pool.query('INSERT INTO workflow (name, steps, status) VALUES ($1, $2, $3) RETURNING *', [name || null, steps, 'no_in_use']);
+    res.status(201).json({ message: 'Workflow created', workflow: insert.rows[0] });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error('create workflow error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// -------------------------------
-// UPDATE workflow (protected, no duplicates)
-// If an identical workflow already exists (different id), return it instead of updating
-// -------------------------------
+// Update workflow (no duplicate check across different id)
 router.put('/:id', verifyToken, isSuperAdmin, async (req, res) => {
   const { id } = req.params;
-  const { first_step, second_step, third_step, fourth_step, fifth_step } = req.body;
+  const { name, steps } = req.body;
+
+  if (steps && (!Array.isArray(steps) || steps.length === 0)) return res.status(400).json({ message: 'steps must be a non-empty array' });
 
   try {
-    // 1. Ensure the target workflow exists
     const target = await pool.query('SELECT * FROM workflow WHERE id = $1', [id]);
-    if (target.rows.length === 0) {
-      return res.status(404).json({ error: 'Workflow not found' });
+    if (target.rows.length === 0) return res.status(404).json({ message: 'Workflow not found' });
+
+    if (steps) {
+      const rolesRes = await pool.query('SELECT role_name FROM roles WHERE role_name = ANY($1)', [steps]);
+      if (rolesRes.rows.length !== steps.length) return res.status(400).json({ message: 'One or more steps reference non-existent roles' });
     }
 
-
-
-    // 3. Perform the update
-    const updateResult = await pool.query(
-      `UPDATE workflow
-       SET first_step = $1, second_step = $2, third_step = $3, fourth_step = $4, fifth_step = $5
-       WHERE id = $6
-       RETURNING *`,
-      [first_step, second_step, third_step, fourth_step, fifth_step, id]
-    );
-
-    if (updateResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Workflow not found' });
-    }
-
-    res.json({ message: 'Workflow updated successfully', workflow: updateResult.rows[0] });
-
+    const update = await pool.query('UPDATE workflow SET name = COALESCE($1, name), steps = COALESCE($2, steps) WHERE id = $3 RETURNING *', [name, steps, id]);
+    res.json({ message: 'Workflow updated', workflow: update.rows[0] });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error('update workflow error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 
-// -------------------------------
-// DELETE workflow (protected)
-// -------------------------------
+// Delete workflow
 router.delete('/:id', verifyToken, isSuperAdmin, async (req, res) => {
   const { id } = req.params;
-
   try {
-    const deleteResult = await pool.query('DELETE FROM workflow WHERE id = $1 RETURNING *', [id]);
-    if (deleteResult.rows.length === 0) {
-      return res.status(404).json({ error: 'Workflow not found' });
-    }
-
-    res.json({ message: 'Workflow deleted successfully', workflow: deleteResult.rows[0] });
+    const del = await pool.query('DELETE FROM workflow WHERE id = $1 RETURNING *', [id]);
+    if (del.rows.length === 0) return res.status(404).json({ message: 'Workflow not found' });
+    res.json({ message: 'Workflow deleted', workflow: del.rows[0] });
   } catch (err) {
-    console.error(err.message);
-    res.status(500).json({ error: 'Server error' });
+    console.error('delete workflow error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

@@ -1,56 +1,46 @@
-//backend/routes/roles.js
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
-const { verifyToken } = require('../middlewares/superAdminMiddelware');
-const { isAdminOrSuperAdmin } = require('../middlewares/adminOrSuperAdminMiddleware');
+require('dotenv').config();
+const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelware');
 
-router.put('/setRole', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-  const { id, role_id } = req.body;
+// Assign role to a user (idempotent)
+router.put('/setRole', verifyToken, isSuperAdmin, async (req, res) => {
+  const { user_id, role_id } = req.body;
+  if (!user_id || !role_id) return res.status(400).json({ message: 'user_id and role_id required' });
 
   try {
-    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    if (existing.rows.length === 0)
-      return res.status(400).json({ message: 'Users does not exists' });
+    // ensure user exists
+    const userCheck = await pool.query('SELECT id FROM users WHERE id = $1', [user_id]);
+    if (userCheck.rows.length === 0) return res.status(404).json({ message: 'User not found' });
 
+    // insert if not exists
+    const existing = await pool.query('SELECT * FROM user_roles WHERE user_id = $1 AND role_id = $2', [user_id, role_id]);
+    if (existing.rows.length === 0) {
+      await pool.query('INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)', [user_id, role_id]);
+    }
 
-    const result = await pool.query(
-      `UPDATE users SET role_id = $1 WHERE id = $2`, [role_id, id]
-    );
-
-    res.status(201).json({
-      message: 'role assaign successful',
-      admin: result.rows[0],
-    });
+    res.json({ message: 'Role assigned' });
   } catch (err) {
-    console.error('role assaignement error:', err);
+    console.error('setRole error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-// Set Faculty
-router.put('/setFaculty', verifyToken, isAdminOrSuperAdmin, async (req, res) => {
-  const { id, faculty_id } = req.body;
+// Create a new role
+router.post('/roles', verifyToken, isSuperAdmin, async (req, res) => {
+  const { role_name } = req.body;
+  if (!role_name) return res.status(400).json({ message: 'role_name required' });
 
   try {
-    // Check if user exists
-    const existing = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
-    if (existing.rows.length === 0)
-      return res.status(400).json({ message: 'User does not exist' });
+    // check duplicate
+    const dup = await pool.query('SELECT id FROM roles WHERE role_name = $1', [role_name]);
+    if (dup.rows.length > 0) return res.status(400).json({ message: 'Role already exists' });
 
-    // Update faculty
-    const result = await pool.query(
-      `UPDATE users SET faculty_id = $1 WHERE id = $2 RETURNING *`,
-      [faculty_id, id]
-    );
-
-    res.status(201).json({
-      message: 'Faculty assignment successful',
-      user: result.rows[0],
-    });
-
+    const insert = await pool.query('INSERT INTO roles (role_name) VALUES ($1) RETURNING *', [role_name]);
+    res.status(201).json({ message: 'Role created', role: insert.rows[0] });
   } catch (err) {
-    console.error('Faculty assignment error:', err);
+    console.error('create role error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 });

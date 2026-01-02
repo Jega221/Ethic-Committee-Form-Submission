@@ -9,14 +9,32 @@ const { verifyToken, isSuperAdmin } = require('../middlewares/superAdminMiddelwa
  */
 router.get('/users', verifyToken, async (req, res) => {
   try {
+    // Aggregate roles from user_roles -> roles since `users` table may not have `role_id`
     const query = `
-      SELECT u.id, u.name, u.surname, u.email, u.role_id, u.faculty_id, r.role_name, f.name AS faculty_name, u.created_at
+      SELECT
+        u.id,
+        u.name,
+        u.surname,
+        u.email,
+        u.faculty_id,
+        COALESCE(f.name, '') AS faculty_name,
+        -- gather role names into an array
+        COALESCE(array_remove(array_agg(r.role_name ORDER BY r.role_name), NULL), '{}') AS roles,
+        -- convenience: primary role (first) if present
+        (array_remove(array_agg(r.role_name ORDER BY r.role_name), NULL))[1] AS role_name,
+        u.created_at
       FROM users u
-      LEFT JOIN roles r ON u.role_id = r.id
+      LEFT JOIN user_roles ur ON ur.user_id = u.id
+      LEFT JOIN roles r ON r.id = ur.role_id
       LEFT JOIN faculties f ON u.faculty_id = f.id
+      GROUP BY u.id, u.name, u.surname, u.email, u.faculty_id, f.name, u.created_at
       ORDER BY u.id
     `;
-    const users = (await pool.query(query)).rows;
+    const users = (await pool.query(query)).rows.map(u => ({
+      ...u,
+      // ensure roles is always an array of strings
+      roles: Array.isArray(u.roles) ? u.roles : []
+    }));
     res.json(users);
   } catch (err) {
     console.error(err);
