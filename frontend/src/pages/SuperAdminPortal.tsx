@@ -73,7 +73,22 @@ import {
     ResponsiveContainer
 } from 'recharts';
 
+const normalizeSteps = (steps: any): string[] => {
+    if (Array.isArray(steps)) return steps;
+
+    if (typeof steps === 'string') {
+        return steps
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+};
+
+
 const SuperAdminPortal = () => {
+    console.log('[SuperAdminPortal] Component mounting');
     const [activeTab, setActiveTab] = useState("overview");
     const [loading, setLoading] = useState(true);
 
@@ -94,11 +109,13 @@ const SuperAdminPortal = () => {
     const [editingFaculty, setEditingFaculty] = useState<any>(null);
 
     useEffect(() => {
+        console.log('[SuperAdminPortal] useEffect - calling fetchAllData');
         fetchAllData();
     }, []);
 
     const fetchAllData = async () => {
         try {
+            console.log('[SuperAdminPortal] fetchAllData - starting');
             setLoading(true);
             const [uRes, fRes, wRes, aRes] = await Promise.all([
                 getUsers(),
@@ -106,12 +123,13 @@ const SuperAdminPortal = () => {
                 getWorkflows(),
                 getAllApplications()
             ]);
+            console.log('[SuperAdminPortal] fetchAllData - got responses:', { users: uRes.data?.length, faculties: fRes.data?.length, workflows: wRes.data?.length, applications: aRes.data?.length });
             setUsers(uRes.data);
             setFaculties(fRes.data);
             setWorkflows(wRes.data);
             setApplications(aRes.data);
         } catch (err) {
-            console.error("Failed to fetch super admin data", err);
+            console.error("[SuperAdminPortal] Failed to fetch super admin data", err);
             toast.error("Failed to load dashboard data");
         } finally {
             setLoading(false);
@@ -179,44 +197,79 @@ const SuperAdminPortal = () => {
 
     // Workflow Handlers
     const [isAddWorkflowOpen, setIsAddWorkflowOpen] = useState(false);
-    const [newWorkflowSteps, setNewWorkflowSteps] = useState({
-        first_step: 'faculty',
-        second_step: 'committee',
-        third_step: 'rectorate',
-        fourth_step: 'done',
-        fifth_step: ''
-    });
-
+    const DEFAULT_STEPS = ['committee_member', 'Faculty Admin', 'Rector'];
+    const [newWorkflowSteps, setNewWorkflowSteps] = useState<string[]>(DEFAULT_STEPS);
     const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
+
+    const stepOptions = [
+        'committee_member',
+        'Faculty Admin',
+        'Rector',
+        'Admin'
+    ];
+
+    const getStepLabel = (step: string): string => {
+        const labels: Record<string, string> = {
+            'committee_member': 'Ethic Committee',
+            'Faculty Admin': 'Faculty Review (Dean)',
+            'Rector': 'Rectorate Approval',
+            'Admin': 'Administrator Review'
+        };
+        return labels[step] || step;
+    };
+
+    const addStep = () => {
+        setNewWorkflowSteps([...newWorkflowSteps, '']);
+    };
+
+    const removeStep = (index: number) => {
+        if (newWorkflowSteps.length > 1) {
+            setNewWorkflowSteps(newWorkflowSteps.filter((_, i) => i !== index));
+        } else {
+            toast.error("Workflow must have at least 1 step");
+        }
+    };
+
+    const updateStep = (index: number, value: string) => {
+        const updated = [...newWorkflowSteps];
+        updated[index] = value;
+        setNewWorkflowSteps(updated);
+    };
 
     const handleCreateWorkflow = async () => {
         try {
-            const payload = {
-                ...newWorkflowSteps,
-                fifth_step: newWorkflowSteps.fifth_step || null // backend handles nulls better
-            };
+            const filteredSteps = newWorkflowSteps.filter(s => s && s.trim());
+            if (filteredSteps.length === 0) {
+                toast.error("Please add at least one step");
+                return;
+            }
+            const payload = { steps: filteredSteps };
             await createWorkflow(payload);
             toast.success("Workflow created successfully");
             setIsAddWorkflowOpen(false);
+            setNewWorkflowSteps(['committee_member', 'Faculty Admin', 'Rector']);
             fetchAllData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || "Failed to create workflow");
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to create workflow");
         }
     };
 
     const handleUpdateWorkflow = async () => {
         if (!editingWorkflow) return;
         try {
-            const payload = {
-                ...newWorkflowSteps,
-                fifth_step: newWorkflowSteps.fifth_step || null
-            };
+            const filteredSteps = newWorkflowSteps.filter(s => s && s.trim());
+            if (filteredSteps.length === 0) {
+                toast.error("Please add at least one step");
+                return;
+            }
+            const payload = { steps: filteredSteps };
             await updateWorkflow(editingWorkflow.id, payload);
             toast.success("Workflow updated successfully");
             setEditingWorkflow(null);
+            setNewWorkflowSteps(['committee_member', 'Faculty Admin', 'Rector']);
             fetchAllData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || "Failed to update workflow");
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to update workflow");
         }
     };
 
@@ -227,19 +280,13 @@ const SuperAdminPortal = () => {
             toast.success("Workflow deleted");
             fetchAllData();
         } catch (err: any) {
-            toast.error(err.response?.data?.error || "Failed to delete workflow");
+            toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to delete workflow");
         }
     };
 
     const openEditWorkflow = (workflow: any) => {
-        setEditingWorkflow(workflow);
-        setNewWorkflowSteps({
-            first_step: workflow.first_step || '',
-            second_step: workflow.second_step || '',
-            third_step: workflow.third_step || '',
-            fourth_step: workflow.fourth_step || '',
-            fifth_step: workflow.fifth_step || ''
-        });
+    setEditingWorkflow(workflow);
+    setNewWorkflowSteps(normalizeSteps(workflow.steps));
     };
 
     const handleSetCurrentWorkflow = async (id: string | number) => {
@@ -545,12 +592,12 @@ const SuperAdminPortal = () => {
                                                             <p className="text-sm text-slate-500 italic">Sequential processing steps</p>
                                                         </div>
                                                         <div className="flex items-center gap-4 flex-wrap">
-                                                            {[w.first_step, w.second_step, w.third_step, w.fourth_step, w.fifth_step].filter(Boolean).map((step, idx) => (
+                                                            {normalizeSteps(w.steps).map((step: string, idx: number) => (
                                                                 <React.Fragment key={idx}>
                                                                     <div className="bg-white border px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 shadow-sm capitalize">
                                                                         {step}
                                                                     </div>
-                                                                    {idx < [w.first_step, w.second_step, w.third_step, w.fourth_step, w.fifth_step].filter(Boolean).length - 1 &&
+                                                                    {idx < (w.steps || []).length - 1 &&
                                                                         <ArrowRight className="w-4 h-4 text-slate-300" />
                                                                     }
                                                                 </React.Fragment>
@@ -681,53 +728,56 @@ const SuperAdminPortal = () => {
                 </DialogContent>
             </Dialog>
             <Dialog open={isAddWorkflowOpen} onOpenChange={setIsAddWorkflowOpen}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>Create Custom Approval Workflow</DialogTitle></DialogHeader>
                     <div className="space-y-6 py-4">
-                        <p className="text-sm text-muted-foreground">Define the sequence of approval steps. All applications will follow this order once activated.</p>
+                        <p className="text-sm text-muted-foreground">Define the sequence of approval steps. Add or remove steps using the + and - buttons. All applications will follow this order once activated.</p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[
-                                { id: 'first_step', label: '1st Step' },
-                                { id: 'second_step', label: '2nd Step' },
-                                { id: 'third_step', label: '3rd Step' },
-                                { id: 'fourth_step', label: '4th Step' },
-                                { id: 'fifth_step', label: '5th Step (Optional)' },
-                            ].map((step) => (
-                                <div key={step.id} className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{step.label}</Label>
-                                    <Select
-                                        value={(newWorkflowSteps as any)[step.id]}
-                                        onValueChange={(val) => setNewWorkflowSteps({ ...newWorkflowSteps, [step.id]: val })}
+                        <div className="space-y-3">
+                            {newWorkflowSteps.map((step, idx) => (
+                                <div key={idx} className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">Step {idx + 1}</Label>
+                                        <Select value={step} onValueChange={(val) => updateStep(idx, val)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select step" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {stepOptions.map(opt => (
+                                                    <SelectItem key={opt} value={opt} className="capitalize">
+                                                        {getStepLabel(opt)}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        onClick={() => removeStep(idx)}
+                                        className="text-destructive hover:text-destructive"
+                                        title="Remove step"
                                     >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Step" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="supervisor">Supervisor Review</SelectItem>
-                                            <SelectItem value="faculty">Faculty Review (Dean)</SelectItem>
-                                            <SelectItem value="committee">Ethic Committee</SelectItem>
-                                            <SelectItem value="rectorate">Rectorate Approval</SelectItem>
-                                            <SelectItem value="done">Terminator (Done)</SelectItem>
-                                            <SelectItem value="">None / Skip</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
                                 </div>
                             ))}
                         </div>
 
+                        <Button
+                            variant="outline"
+                            onClick={addStep}
+                            className="w-full border-dashed"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Add Step
+                        </Button>
+
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Workflow Preview</h4>
                             <div className="flex items-center gap-2 flex-wrap">
-                                {[
-                                    newWorkflowSteps.first_step,
-                                    newWorkflowSteps.second_step,
-                                    newWorkflowSteps.third_step,
-                                    newWorkflowSteps.fourth_step,
-                                    newWorkflowSteps.fifth_step
-                                ].filter(Boolean).map((s, i, arr) => (
+                                {newWorkflowSteps.filter(Boolean).map((s, i, arr) => (
                                     <React.Fragment key={i}>
-                                        <Badge variant="outline" className="bg-white capitalize py-1.5 px-3">{s}</Badge>
+                                        <Badge variant="outline" className="bg-white capitalize py-1.5 px-3">{getStepLabel(s)}</Badge>
                                         {i < arr.length - 1 && <ArrowRight className="w-3 h-3 text-slate-400" />}
                                     </React.Fragment>
                                 ))}
@@ -742,50 +792,56 @@ const SuperAdminPortal = () => {
             </Dialog>
 
             <Dialog open={!!editingWorkflow} onOpenChange={(open) => !open && setEditingWorkflow(null)}>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                     <DialogHeader><DialogTitle>Edit Workflow #{editingWorkflow?.id}</DialogTitle></DialogHeader>
                     <div className="space-y-6 py-4">
-                        <p className="text-sm text-muted-foreground">Modify the sequence of approval steps.</p>
+                        <p className="text-sm text-muted-foreground">Modify the sequence of approval steps. Add or remove steps using the + and - buttons.</p>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {[
-                                { id: 'first_step', label: '1st Step' },
-                                { id: 'second_step', label: '2nd Step' },
-                                { id: 'third_step', label: '3rd Step' },
-                                { id: 'fourth_step', label: '4th Step' },
-                                { id: 'fifth_step', label: '5th Step (Optional)' },
-                            ].map((step) => (
-                                <div key={step.id} className="space-y-2">
-                                    <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">{step.label}</Label>
-                                    <select
-                                        className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                                        value={(newWorkflowSteps as any)[step.id]}
-                                        onChange={(e) => setNewWorkflowSteps({ ...newWorkflowSteps, [step.id]: e.target.value })}
+                        <div className="space-y-3">
+                            {newWorkflowSteps.map((step, idx) => (
+                                <div key={idx} className="flex gap-2 items-end">
+                                    <div className="flex-1">
+                                        <Label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2 block">Step {idx + 1}</Label>
+                                        <Select value={step} onValueChange={(val) => updateStep(idx, val)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select step" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {stepOptions.map(opt => (
+                                                    <SelectItem key={opt} value={opt} className="capitalize">
+                                                        {getStepLabel(opt)}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        onClick={() => removeStep(idx)}
+                                        className="text-destructive hover:text-destructive"
+                                        title="Remove step"
                                     >
-                                        <option value="" disabled>Select Step</option>
-                                        <option value="supervisor">Supervisor Review</option>
-                                        <option value="faculty">Faculty Review (Dean)</option>
-                                        <option value="committee">Ethic Committee</option>
-                                        <option value="rectorate">Rectorate Approval</option>
-                                        <option value="done">Terminator (Done)</option>
-                                        <option value="">None / Skip</option>
-                                    </select>
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
                                 </div>
                             ))}
                         </div>
 
+                        <Button
+                            variant="outline"
+                            onClick={addStep}
+                            className="w-full border-dashed"
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Add Step
+                        </Button>
+
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
                             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Workflow Preview</h4>
                             <div className="flex items-center gap-2 flex-wrap">
-                                {[
-                                    newWorkflowSteps.first_step,
-                                    newWorkflowSteps.second_step,
-                                    newWorkflowSteps.third_step,
-                                    newWorkflowSteps.fourth_step,
-                                    newWorkflowSteps.fifth_step
-                                ].filter(Boolean).map((s, i, arr) => (
+                                {newWorkflowSteps.filter(Boolean).map((s, i, arr) => (
                                     <React.Fragment key={i}>
-                                        <Badge variant="outline" className="bg-white capitalize py-1.5 px-3">{s}</Badge>
+                                        <Badge variant="outline" className="bg-white capitalize py-1.5 px-3">{getStepLabel(s)}</Badge>
                                         {i < arr.length - 1 && <ArrowRight className="w-3 h-3 text-slate-400" />}
                                     </React.Fragment>
                                 ))}

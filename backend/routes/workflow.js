@@ -38,7 +38,7 @@ router.put('/:id/set-current', verifyToken, isSuperAdmin, async (req, res) => {
 
 // Create new workflow (steps is a text[])
 router.post('/', verifyToken, isSuperAdmin, async (req, res) => {
-  const { name, steps } = req.body; // steps should be an array of role names
+  const { steps } = req.body; // steps should be an array of role names
 
   if (!Array.isArray(steps) || steps.length === 0) return res.status(400).json({ message: 'steps must be a non-empty array' });
 
@@ -54,7 +54,7 @@ router.post('/', verifyToken, isSuperAdmin, async (req, res) => {
     const dup = await pool.query('SELECT * FROM workflow WHERE steps = $1', [steps]);
     if (dup.rows.length > 0) return res.status(400).json({ message: 'Duplicate workflow exists' });
 
-    const insert = await pool.query('INSERT INTO workflow (name, steps, status) VALUES ($1, $2, $3) RETURNING *', [name || null, steps, 'no_in_use']);
+    const insert = await pool.query('INSERT INTO workflow (steps, status) VALUES ($1, $2) RETURNING *', [steps, 'no_in_use']);
     res.status(201).json({ message: 'Workflow created', workflow: insert.rows[0] });
   } catch (err) {
     console.error('create workflow error:', err);
@@ -78,7 +78,7 @@ router.put('/:id', verifyToken, isSuperAdmin, async (req, res) => {
       if (rolesRes.rows.length !== steps.length) return res.status(400).json({ message: 'One or more steps reference non-existent roles' });
     }
 
-    const update = await pool.query('UPDATE workflow SET name = COALESCE($1, name), steps = COALESCE($2, steps) WHERE id = $3 RETURNING *', [name, steps, id]);
+    const update = await pool.query('UPDATE workflow SET steps = COALESCE($1, steps) WHERE id = $2 RETURNING *', [steps, id]);
     res.json({ message: 'Workflow updated', workflow: update.rows[0] });
   } catch (err) {
     console.error('update workflow error:', err);
