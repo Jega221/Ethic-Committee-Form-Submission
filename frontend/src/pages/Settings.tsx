@@ -104,23 +104,32 @@ const Settings = () => {
 
       console.log('Profile update response:', response);
 
-      // Update local storage
+      // Backend returns { token, user: { id, name, surname, email, ... } }
+      const user = response.data?.user || response.data;
+      const token = response.data?.token;
+
+      if (token) {
+        localStorage.setItem('token', token);
+      }
+
+      // Update local storage (normalize to frontend shape)
       const currentProfile = JSON.parse(localStorage.getItem('userProfile') || '{}');
       const updatedProfile = {
         ...currentProfile,
-        name: response.data.user.name,
-        firstName: response.data.user.firstName || response.data.user.name,
-        surname: response.data.user.surname,
-        email: response.data.user.email,
-        faculty_id: response.data.user.faculty_id,
-        faculty: response.data.user.faculty,
+        name: user?.name || currentProfile.name || '',
+        firstName: user?.name || currentProfile.firstName || '',
+        surname: user?.surname || currentProfile.surname || '',
+        email: user?.email || currentProfile.email || '',
+        faculty_id: user?.faculty_id ?? currentProfile.faculty_id ?? null,
+        faculty: user?.faculty ?? currentProfile.faculty ?? '',
       };
+
       localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
       console.log('Updated profile in localStorage:', updatedProfile);
 
       // Update state
       setProfile({
-        firstName: updatedProfile.firstName || updatedProfile.name,
+        firstName: updatedProfile.firstName,
         surname: updatedProfile.surname,
         email: updatedProfile.email,
         faculty: updatedProfile.faculty || '',
