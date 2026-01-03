@@ -176,7 +176,15 @@ export async function deleteWorkflow(id: string | number) {
 
 // 14) User Role & Faculty Management
 export async function setUserRole(userId: string | number, roleId: string | number) {
-  return api.put('/api/Role/setRole', { id: userId, role_id: roleId });
+  return api.put('/api/Role/setRole', { user_id: String(userId), role_id: Number(roleId) });
+}
+
+export async function setUserRoles(userId: string | number, roleIds: (string|number)[]) {
+  return api.put('/api/Role/setRoles', { user_id: String(userId), role_ids: roleIds.map(r => Number(r)) });
+}
+
+export async function getRolesList() {
+  return api.get('/api/Role/roles');
 }
 
 export async function setUserFaculty(userId: string | number, facultyId: string | number) {

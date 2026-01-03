@@ -33,23 +33,31 @@ const Login = () => {
         }
       );
 
-      // Ensure role is set - if missing, try to decode from token
-      if (!data.user.role && data.token) {
+      // Decode JWT to extract roles array
+      let rolesArray: string[] = [];
+      if (data.token) {
         try {
           const tokenParts = data.token.split('.');
           if (tokenParts.length === 3) {
             const payload = JSON.parse(atob(tokenParts[1]));
-            data.user.role = payload.role;
-            data.user.role_id = payload.role;
-            console.log('Role decoded from token:', payload.role);
+            rolesArray = Array.isArray(payload.roles) ? payload.roles : (payload.role ? [String(payload.role)] : []);
+            console.log('Roles decoded from token:', rolesArray);
+            // Update user object with roles from token if not present
+            if (!data.user.roles) {
+              data.user.roles = rolesArray;
+            }
           }
         } catch (e) {
-          console.error('Failed to decode role from token:', e);
+          console.error('Failed to decode roles from token:', e);
         }
       }
 
-      console.log('Login response - user data:', data.user);
+      console.log('Login response - user data:', data.user, 'roles:', rolesArray);
       localStorage.setItem("token", data.token);
+      // Ensure singular role field is a string (first role) for compatibility
+      if ((!data.user.role || data.user.role === null) && Array.isArray(data.user.roles) && data.user.roles.length > 0) {
+        data.user.role = String(data.user.roles[0]);
+      }
       localStorage.setItem("userProfile", JSON.stringify(data.user));
 
       toast({
@@ -57,20 +65,34 @@ const Login = () => {
         description: `Welcome back, ${data.user.name}!`,
       });
 
-      // Role-based redirection
-      const role = data.user.role;
-      if (role === 'admin' || role === 6) {
-        navigate("/admin");
-      } else if (role === 'super_admin' || role === 1) {
-        navigate("/super-admin");
-      } else if (role === 5) {
-        navigate("/rector");
-      } else if (role === 4) {
-        navigate("/faculty");
-      } else if (role === 2) {
-        navigate("/committee");
+      // Role-based redirection (normalized role names)
+      const roles = data.user.roles || rolesArray || [];
+      const userRole = data.user.role; // fallback for backward compatibility
+
+      const normalizeRole = (r: any) => {
+        if (r === null || r === undefined) return '';
+        try {
+          return String(r).toLowerCase().replace(/[- ]+/g, '_').trim();
+        } catch (e) {
+          return String(r || '');
+        }
+      };
+
+      const normalizedRoles = Array.isArray(roles) ? roles.map(normalizeRole) : [];
+      const normalizedUserRole = normalizeRole(userRole);
+
+      if (normalizedRoles.includes('super_admin') || normalizedUserRole === 'super_admin') {
+        navigate('/super-admin');
+      } else if (normalizedRoles.includes('admin') || normalizedUserRole === 'admin') {
+        navigate('/admin');
+      } else if (normalizedRoles.includes('rector') || normalizedUserRole === 'rector') {
+        navigate('/rector');
+      } else if (normalizedRoles.includes('faculty') || normalizedUserRole === 'faculty') {
+        navigate('/faculty');
+      } else if (normalizedRoles.includes('committee') || normalizedUserRole === 'committee') {
+        navigate('/committee');
       } else {
-        navigate("/dashboard");
+        navigate('/dashboard');
       }
     } catch (err: any) {
       console.error(err);

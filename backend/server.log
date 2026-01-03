@@ -1,145 +1,15 @@
-[dotenv@17.2.3] injecting env (3) from .env -- tip: ⚙️  override existing env vars with { override: true }
-[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
+[dotenv@17.2.3] injecting env (3) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
 [dotenv@17.2.3] injecting env (0) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 👥 sync secrets across teammates & machines: https://dotenvx.com/ops
 verifyToken: [Function: verifyToken]
 isSuperAdmin: [Function: isSuperAdmin]
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 📡 add observability to secrets: https://dotenvx.com/ops
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔄 add secrets lifecycle management: https://dotenvx.com/ops
 [dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  override existing env vars with { override: true }
-[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 prevent building .env in docker: https://dotenvx.com/prebuild
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  enable debug logging with { debug: true }
+[dotenv@17.2.3] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+[dotenv@17.2.3] injecting env (0) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
 🚀 Server is running on http://localhost:3000
 id: 22 name: John logged in
-id: 22 name: John logged in
-id: 21 name: Admin logged in
-id: 9 name: one  logged in
-⏱️ Running scheduled pending check...
-⏳ Checking for pending applications...
-🔔 Pending >48hr: Application #14
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1PYGyTc4D.a-CAAAKjpBA7IFRmOUnZ0TMZrE1t8k
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #17
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1QE.zpT4HjOt7AAAKj5plo4-jxFI4NGa962zj2Cg
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #3
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1Q3aur3U3sQJLAAAKkH4RnT35Xk3.9CN.5YgecOc
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #4
-✅ Email sent to gedeonlombe200@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1Rk.zpT4HjOuEAAAKkYSFZcqJkYoNsphPXR8zzK4
-🔔 Notification created for researcher 5
-🔔 Pending >48hr: Application #5
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1SE.zpT4HjOuHAAAKkrY8xjYV1XE3gY.K.2H5rOA
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #7
-✅ Email sent to committee@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1S6PtGIlBAX50AAAKk2Hi6IIWagnEQXhPyN0-kWw
-🔔 Notification created for researcher 2
-🔔 Pending >48hr: Application #9
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1T6PtGIlBAX53AAAKlK.1-QzULXim1Ifl..KLi2A
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #11
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1UqPtGIlBAX56AAAKlQfHt9.alg5.NVF13joPzJI
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #12
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1VYGyTc4D.a-FAAAKlstk38MvDng.eDX-E3YtUVY
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #18
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1V3aur3U3sQJgAAAKl3OjbHhe-ryILg6D7WSs2lU
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #19
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1W3aur3U3sQJjAAAKmPg15TesKOKSARpXYU0IXwc
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #23
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1XqPtGIlBAX6DAAAKmfTcNmgbdJ.R49cXmsboDxY
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #24
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1YoGyTc4D.a-XAAAKms1u7iBl.W0DUQ9utlypNGQ
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #25
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1ZaPtGIlBAX6GAAAKm5rAssb1ozTi3Gxu3BW4BxA
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #29
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVg1aXaur3U3sQJmAAAKnBWeKjMrwyRkl0Fa3BBEE2Y
-🔔 Notification created for researcher 9
-✅ 48-hour pending check complete.
-
-⏱️ Running scheduled pending check...
-⏳ Checking for pending applications...
-🔔 Pending >48hr: Application #14
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDT4GyTc4D.bLmAAAKrC9hfG63gZn8avGZc1uVtig
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #17
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDUk.zpT4HjO8sAAAKrdR1zzAG17BIMy4KMpDG0Zc
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #3
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDVKPtGIlBAYJCAAAKrsxwRApOT1RAkrSNstjEhlA
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #4
-✅ Email sent to gedeonlombe200@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDV0.zpT4HjO8vAAAKrxS5KKhPwWSnD.Zet1TlLww
-🔔 Notification created for researcher 5
-🔔 Pending >48hr: Application #5
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDWYGyTc4D.bLsAAAKsOsI6w2bgSIwt.bEKzgP8FM
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #7
-✅ Email sent to committee@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDXIGyTc4D.bLvAAAKsQYQS4eTg5zKTJSKaa-8d.g
-🔔 Notification created for researcher 2
-🔔 Pending >48hr: Application #9
-✅ Email sent to admin@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDXnaur3U3sQXsAAAKsmpqinjdwzwDzcWQsZvQ9oY
-🔔 Notification created for researcher 1
-🔔 Pending >48hr: Application #11
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDYk.zpT4HjO8yAAAKs1raJLnjpYFN-Oj4Mjj8EqI
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #12
-✅ Email sent to ali@example.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDZIGyTc4D.bLyAAAKtG1DJQxfqWjs2I7vp2zEmO8
-🔔 Notification created for researcher 4
-🔔 Pending >48hr: Application #18
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDZqPtGIlBAYJLAAAKtfqVkA2tdlK2Nd1H6fTM8Os
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #19
-✅ Email sent to sd@w.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDaaPtGIlBAYJUAAAKtjEJzg9XUXmUYFdyk75KYzI
-🔔 Notification created for researcher 8
-🔔 Pending >48hr: Application #23
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDbXaur3U3sQX7AAAKt3guLajmfA3YPGSnEebkMr8
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #24
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDcU.zpT4HjO9BAAAKuMbusLAq6vNIwCKaYciketo
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #25
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDc0.zpT4HjO9HAAAKudHVQoPqaQ01dBRrFMtuupA
-🔔 Notification created for researcher 9
-🔔 Pending >48hr: Application #29
-✅ Email sent to one@gmail.com
-📩 Preview URL: https://ethereal.email/message/aP0PwIw8PbMuOmXkaVhDdk.zpT4HjO9KAAAKuh.3wMRN-4DyFwVD-ngnVBE
-🔔 Notification created for researcher 9
-✅ 48-hour pending check complete.
-
+FetchFacultiesDB: 350.512ms

@@ -35,19 +35,57 @@ export interface BaseSidebarProps {
 export function BaseSidebar({
     menuItems,
     currentRole,
-    availableRoles = [
+    availableRoles
+}: BaseSidebarProps) {
+    const navigate = useNavigate();
+    const location = useLocation();
+    const { setOpenMobile, toggleSidebar } = useSidebar();
+    // Read user profile from localStorage to support runtime role switching
+    const rawProfile = typeof window !== 'undefined' ? localStorage.getItem('userProfile') : null;
+    const parsedProfile = rawProfile ? JSON.parse(rawProfile) : null;
+
+    const normalizeRole = (r: any) => {
+        if (r === null || r === undefined) return '';
+        return String(r).toLowerCase().replace(/[- ]+/g, '_').trim();
+    };
+
+    const canonicalRole = (r: string) => {
+        const s = normalizeRole(r);
+        if (!s) return s;
+        if (s.includes('super')) return 'super_admin';
+        if (s.includes('faculty')) return 'faculty';
+        if (s.includes('committee')) return 'committee';
+        if (s.includes('rector')) return 'rector';
+        if (s.includes('admin')) return 'admin';
+        if (s.includes('research')) return 'researcher';
+        return s;
+    };
+
+    const displayRoleLabel = (r: string) => {
+        if (!r) return '';
+        const cleaned = String(r).replace(/[_-]/g, ' ').trim();
+        return cleaned.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+    };
+
+    // Build visible roles list: prefer roles from userProfile if present, otherwise fall back to prop/default
+    const rolesFromProfile: { value: string; label: string }[] = Array.isArray(parsedProfile?.roles)
+        ? parsedProfile.roles.map((r: any) => ({ value: normalizeRole(r), label: displayRoleLabel(String(r)) }))
+        : [];
+
+    const defaultRoles = [
         { value: 'researcher', label: 'Researcher' },
         { value: 'faculty', label: 'Faculty' },
         { value: 'committee', label: 'Committee' },
         { value: 'rector', label: 'Rector' },
         { value: 'admin', label: 'Admin' },
-        { value: 'super-admin', label: 'Super Admin' },
-    ]
-}: BaseSidebarProps) {
-    const navigate = useNavigate();
-    const location = useLocation();
-    const { setOpenMobile, toggleSidebar } = useSidebar();
-    const [selectedRole, setSelectedRole] = useState(currentRole);
+        { value: 'super_admin', label: 'Super Admin' },
+    ];
+
+    const visibleRoles = (rolesFromProfile.length > 0) ? rolesFromProfile : (availableRoles && availableRoles.length > 0 ? availableRoles.map(r=>({value: normalizeRole(r.value), label: r.label})) : defaultRoles);
+
+    const rawInitial = parsedProfile?.role ? normalizeRole(parsedProfile.role) : (currentRole ? normalizeRole(currentRole) : (visibleRoles[0]?.value || 'researcher'));
+    const initialRole = canonicalRole(rawInitial);
+    const [selectedRole, setSelectedRole] = useState<string>(initialRole);
 
     const handleLogout = () => {
         localStorage.clear(); // Clear all auth data
@@ -61,14 +99,36 @@ export function BaseSidebar({
     };
 
     const handleRoleChange = (role: string) => {
-        setSelectedRole(role);
-        // Add logic to navigate based on role if needed
-        if (role === 'researcher') navigate('/dashboard');
-        if (role === 'faculty') navigate('/faculty');
-        if (role === 'committee') navigate('/committee');
-        if (role === 'rector') navigate('/rector');
-        if (role === 'admin') navigate('/admin');
-        if (role === 'super-admin') navigate('/super-admin');
+        const normalized = normalizeRole(role);
+        const canon = canonicalRole(normalized);
+        setSelectedRole(canon);
+
+        // Persist active role to localStorage so ProtectedRoute and other UI read the active role
+        try {
+            const rp = typeof window !== 'undefined' ? localStorage.getItem('userProfile') : null;
+            if (rp) {
+                const prof = JSON.parse(rp);
+                prof.role = canon;
+                localStorage.setItem('userProfile', JSON.stringify(prof));
+            }
+        } catch (e) {
+            // ignore
+        }
+
+        // Role -> route mapping
+        const roleRouteMap: Record<string, string> = {
+            researcher: '/dashboard',
+            faculty: '/faculty',
+            committee: '/committee',
+            rector: '/rector',
+            admin: '/admin',
+            super_admin: '/super-admin'
+        };
+
+        const target = roleRouteMap[canon] || (visibleRoles[0] ? visibleRoles[0].value : '/dashboard');
+
+        // Use replace so switching roles doesn't create back/forward noise
+        navigate(target, { replace: true });
         setOpenMobile(false);
     };
 
@@ -146,7 +206,7 @@ export function BaseSidebar({
                             <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border-border z-[100] rounded-xl shadow-xl">
-                            {availableRoles.map(r => (
+                            {visibleRoles.map(r => (
                                 <SelectItem key={r.value} value={r.value} className="focus:bg-slate-50 focus:text-destructive">
                                     {r.label}
                                 </SelectItem>

@@ -35,21 +35,21 @@ const App = () => (
           <Route path="/signup" element={<Signup />} />
 
           {/* Protected Routes */}
-          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={[3]}><Dashboard /></ProtectedRoute>} />
-          <Route path="/new-application" element={<ProtectedRoute allowedRoles={[3]}><NewApplication /></ProtectedRoute>} />
-          <Route path="/uploaded-files" element={<ProtectedRoute allowedRoles={[3]}><UploadedFiles /></ProtectedRoute>} />
-          <Route path="/study-status" element={<ProtectedRoute allowedRoles={[3]}><StudyStatus /></ProtectedRoute>} />
-          <Route path="/agenda" element={<ProtectedRoute allowedRoles={[3]}><Agenda /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute allowedRoles={[3]}><Settings /></ProtectedRoute>} />
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['researcher']}><Dashboard /></ProtectedRoute>} />
+          <Route path="/new-application" element={<ProtectedRoute allowedRoles={['researcher']}><NewApplication /></ProtectedRoute>} />
+          <Route path="/uploaded-files" element={<ProtectedRoute allowedRoles={['researcher']}><UploadedFiles /></ProtectedRoute>} />
+          <Route path="/study-status" element={<ProtectedRoute allowedRoles={['researcher']}><StudyStatus /></ProtectedRoute>} />
+          <Route path="/agenda" element={<ProtectedRoute allowedRoles={['researcher']}><Agenda /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute allowedRoles={['researcher']}><Settings /></ProtectedRoute>} />
 
-          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin', 6]}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin', 6]}><AdminDashboard /></ProtectedRoute>} />
-          <Route path="/admin/review-oversight" element={<ProtectedRoute allowedRoles={['admin', 6]}><ReviewOversight /></ProtectedRoute>} />
+          <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/review-oversight" element={<ProtectedRoute allowedRoles={['admin']}><ReviewOversight /></ProtectedRoute>} />
 
-          <Route path="/faculty" element={<ProtectedRoute allowedRoles={[4]}><Faculty /></ProtectedRoute>} />
-          <Route path="/committee" element={<ProtectedRoute allowedRoles={[2]}><Committee /></ProtectedRoute>} />
-          <Route path="/rector" element={<ProtectedRoute allowedRoles={[5]}><Rector /></ProtectedRoute>} />
-          <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin', 1]}><SuperAdminPortal /></ProtectedRoute>} />
+          <Route path="/faculty" element={<ProtectedRoute allowedRoles={['faculty']}><Faculty /></ProtectedRoute>} />
+          <Route path="/committee" element={<ProtectedRoute allowedRoles={['committee']}><Committee /></ProtectedRoute>} />
+          <Route path="/rector" element={<ProtectedRoute allowedRoles={['rector']}><Rector /></ProtectedRoute>} />
+          <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminPortal /></ProtectedRoute>} />
 
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />

@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/dialog';
 
 import { toast } from "sonner";
-import { setUserRole, setUserFaculty, getFaculties, getUsers } from '@/lib/api';
+import { setUserRole, setUserRoles, setUserFaculty, getFaculties, getUsers, getRolesList } from '@/lib/api';
 import { Loader2, AlertCircle } from 'lucide-react';
 
 interface User {
@@ -39,6 +39,7 @@ interface User {
   email: string;
   role: string;
   role_id?: number;
+  roles?: string[];
   faculty_id?: number;
   faculty_name?: string;
   status: string;
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
             email: u.email || 'No Email',
             role: u.role_name || 'User',
             role_id: u.role_id,
+            roles: Array.isArray(u.roles) ? u.roles : (u.role_name ? [u.role_name] : []),
             faculty_id: u.faculty_id,
             faculty_name: u.faculty_name,
             status: u.created_at ? new Date(u.created_at).toLocaleDateString() : 'Active'
@@ -118,6 +120,34 @@ export default function AdminDashboard() {
       toast.success("User role updated");
       // Update local state
       setUsers(users.map(u => u.id === userId ? { ...u, role_id: parseInt(roleId) } : u));
+
+      // If the current logged-in user changed their own role, refresh local profile to avoid stale role data
+      try {
+        const profileRaw = localStorage.getItem('userProfile');
+        if (profileRaw) {
+          const profile = JSON.parse(profileRaw);
+          if (String(profile.id) === String(userId)) {
+            // Fetch fresh users and update the local profile entry for this user
+            const fresh = await getUsers();
+            if (Array.isArray(fresh.data)) {
+              const updated = fresh.data.find((fu: any) => String(fu.id) === String(userId));
+              if (updated) {
+                const updatedProfile = {
+                  ...profile,
+                  name: updated.name || profile.name,
+                  surname: updated.surname || profile.surname,
+                  email: updated.email || profile.email,
+                  roles: Array.isArray(updated.roles) ? updated.roles : (updated.role_name ? [updated.role_name] : []),
+                  role: updated.role_name || profile.role,
+                };
+                localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+              }
+            }
+          }
+        }
+      } catch (refreshErr) {
+        console.warn('Failed to refresh local profile after role change', refreshErr);
+      }
     } catch (err) {
       toast.error("Failed to update role");
     }
@@ -142,6 +172,16 @@ export default function AdminDashboard() {
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('Researcher');
   const [isAddUserOpen, setIsAddUserOpen] = useState(false);
+  const [rolesList, setRolesList] = useState<{id:number, role_name:string}[]>([]);
+  const [isManageOpen, setIsManageOpen] = useState(false);
+  const [manageUserId, setManageUserId] = useState<string | null>(null);
+  const [selectedRoleIds, setSelectedRoleIds] = useState<number[]>([]);
+
+  const displayRoleLabel = (r: string) => {
+    if (!r) return '';
+    const cleaned = String(r).replace(/[_-]/g, ' ').trim();
+    return cleaned.split(' ').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ');
+  };
 
   const filteredUsers = users.filter(user => {
     const searchLow = searchQuery.toLowerCase();
@@ -216,6 +256,70 @@ export default function AdminDashboard() {
         console.error('Error adding user:', error);
         alert('Error adding user');
       }
+    }
+  };
+
+  // Load available roles for the Manage Roles dialog
+  React.useEffect(() => {
+    const loadRoles = async () => {
+      try {
+        const res = await getRolesList();
+        if (res.data && Array.isArray(res.data.roles)) setRolesList(res.data.roles);
+      } catch (err) {
+        console.warn('Failed to load roles list', err);
+      }
+    };
+    loadRoles();
+  }, []);
+
+  const openManageDialog = (user: User) => {
+    setManageUserId(user.id);
+    // Map user's role names to ids where possible
+    const mappedIds: number[] = [];
+    if (Array.isArray(user.roles) && user.roles.length > 0) {
+      for (const r of user.roles) {
+        const found = rolesList.find(rr => String(rr.role_name).toLowerCase() === String(r).toLowerCase());
+        if (found) mappedIds.push(found.id);
+      }
+    }
+    setSelectedRoleIds(mappedIds);
+    setIsManageOpen(true);
+  };
+
+  const toggleRoleSelection = (roleId: number) => {
+    setSelectedRoleIds(prev => prev.includes(roleId) ? prev.filter(id => id !== roleId) : [...prev, roleId]);
+  };
+
+  const saveManagedRoles = async () => {
+    if (!manageUserId) return;
+    try {
+      await setUserRoles(manageUserId, selectedRoleIds);
+      toast.success('Roles updated');
+
+      // Update local users state: map role ids back to names
+      const updatedUsers = users.map(u => {
+        if (u.id !== manageUserId) return u;
+        const newRoleNames = rolesList.filter(r => selectedRoleIds.includes(r.id)).map(r => r.role_name);
+        return { ...u, roles: newRoleNames, role_name: newRoleNames[0] || u.role } as any;
+      });
+      setUsers(updatedUsers);
+
+      // If current user changed their own roles, refresh profile in localStorage
+      const profileRaw = localStorage.getItem('userProfile');
+      if (profileRaw) {
+        const profile = JSON.parse(profileRaw);
+        if (String(profile.id) === String(manageUserId)) {
+          const updatedProfile = { ...profile, roles: updatedUsers.find(u => u.id === manageUserId)?.roles || [] };
+          localStorage.setItem('userProfile', JSON.stringify(updatedProfile));
+        }
+      }
+
+      setIsManageOpen(false);
+      setManageUserId(null);
+      setSelectedRoleIds([]);
+    } catch (err) {
+      console.error('Failed to set roles', err);
+      toast.error('Failed to update roles');
     }
   };
 
@@ -395,22 +499,39 @@ export default function AdminDashboard() {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Select
-                              value={user.role_id?.toString()}
-                              onValueChange={(val) => handleRoleChange(user.id, val)}
-                            >
-                              <SelectTrigger className="w-32 h-8 text-xs">
-                                <SelectValue placeholder="Role" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="1">Super Admin</SelectItem>
-                                <SelectItem value="2">Committee Member</SelectItem>
-                                <SelectItem value="3">Researcher</SelectItem>
-                                <SelectItem value="4">Faculty Admin</SelectItem>
-                                <SelectItem value="5">Rector</SelectItem>
-                                <SelectItem value="6">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex flex-col">
+                              <Select
+                                value={user.role_id?.toString()}
+                                onValueChange={(val) => handleRoleChange(user.id, val)}
+                              >
+                                <SelectTrigger className="w-32 h-8 text-xs">
+                                  <SelectValue placeholder="Role" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="1">Super Admin</SelectItem>
+                                  <SelectItem value="2">Committee Member</SelectItem>
+                                  <SelectItem value="3">Researcher</SelectItem>
+                                  <SelectItem value="4">Faculty Admin</SelectItem>
+                                  <SelectItem value="5">Rector</SelectItem>
+                                  <SelectItem value="6">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                {Array.isArray(user.roles) && user.roles.length > 0 ? (
+                                  user.roles.map((r, idx) => (
+                                    <span key={idx} className="text-[10px] px-2 py-1 bg-slate-100 rounded-full text-slate-700">
+                                      {displayRoleLabel(String(r))}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No roles</span>
+                                )}
+                              </div>
+                              <div className="mt-2">
+                                <button onClick={() => openManageDialog(user)} className="text-xs text-primary underline">Manage roles</button>
+                              </div>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Select
@@ -452,6 +573,33 @@ export default function AdminDashboard() {
           </main>
         </div>
       </div>
+      {/* Manage Roles Dialog */}
+      <Dialog open={isManageOpen} onOpenChange={setIsManageOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manage Roles</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {rolesList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No roles available</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {rolesList.map(r => (
+                  <label key={r.id} className="flex items-center gap-2">
+                    <input type="checkbox" checked={selectedRoleIds.includes(r.id)} onChange={() => toggleRoleSelection(r.id)} />
+                    <span className="text-sm">{displayRoleLabel(r.role_name)}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={() => { setIsManageOpen(false); setManageUserId(null); setSelectedRoleIds([]); }}>Cancel</Button>
+              <Button onClick={saveManagedRoles}>Save</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </SidebarProvider>
   );
 }

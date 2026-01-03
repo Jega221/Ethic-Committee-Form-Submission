@@ -30,6 +30,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
         const user = JSON.parse(userProfile);
         let userRole = user.role;
         let userRoleId = user.role_id || userRole;
+        let userRoles = user.roles || []; // Extract roles array
 
         // If role is null/undefined, try to decode from JWT token as fallback
         if ((userRole === null || userRole === undefined) && token) {
@@ -40,40 +41,69 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
                     const payload = JSON.parse(atob(tokenParts[1]));
                     userRole = payload.role;
                     userRoleId = payload.role || userRoleId;
-                    console.log('Decoded role from token:', userRole);
+                    userRoles = Array.isArray(payload.roles) ? payload.roles : [];
+                    console.log('Decoded role from token:', userRole, 'roles:', userRoles);
                 }
             } catch (tokenError) {
                 console.warn('Failed to decode token for role fallback:', tokenError);
             }
         }
 
-        // If still no role, deny access and redirect to login
-        if (userRole === null || userRole === undefined) {
-            console.error('User role is missing from both profile and token. User profile:', user);
+        // If still no single role AND no roles-array, deny access and redirect to login
+        const hasRolesArray = Array.isArray(userRoles) && userRoles.length > 0;
+        if ((userRole === null || userRole === undefined) && !hasRolesArray) {
+            console.error('User role is missing from both profile and token, and roles array is empty. User profile:', user);
             localStorage.removeItem('token');
             localStorage.removeItem('userProfile');
             return <Navigate to="/login" replace />;
         }
 
-        // Check both role and role_id, and handle type coercion (string vs number)
+        // Check both single role and roles array (prefer string role names)
+        // Normalize role strings for robust comparison
+        const normalizeRole = (r: any) => {
+            if (r === null || r === undefined) return '';
+            try {
+                return String(r).toLowerCase().replace(/[- ]+/g, '_').trim();
+            } catch (e) {
+                return String(r || '');
+            }
+        };
+
+        const normalizedUserRoles = Array.isArray(userRoles) ? userRoles.map(r => normalizeRole(r)) : [];
+        // Super-admin bypass: allow full access when user is super_admin (or variants like 'super-admin')
+        if (normalizedUserRoles.includes('super_admin')) {
+            console.debug('ProtectedRoute: super_admin detected — granting access');
+            return <>{children}</>;
+        }
+
+        const userRoleStr = userRole !== null && userRole !== undefined ? normalizeRole(userRole) : '';
+        const userRoleIdStr = userRoleId !== null && userRoleId !== undefined ? String(userRoleId) : '';
+
         const hasAccess = allowedRoles.some(allowedRole => {
-            // Convert both to strings for comparison to handle type mismatches
-            const userRoleStr = String(userRole);
-            const userRoleIdStr = String(userRoleId);
-            const allowedRoleStr = String(allowedRole);
-            
-            return userRoleStr === allowedRoleStr || userRoleIdStr === allowedRoleStr;
+            const allowedRoleStr = normalizeRole(allowedRole);
+
+            // Prefer matching against roles array (normalized)
+            if (normalizedUserRoles.includes(allowedRoleStr)) return true;
+
+            // Fallback: match single role string (normalized)
+            if (userRoleStr && userRoleStr === allowedRoleStr) return true;
+
+            // As a last fallback, match role_id string (kept for compatibility)
+            if (userRoleIdStr && userRoleIdStr === allowedRoleStr) return true;
+
+            return false;
         });
 
         if (!hasAccess) {
             // Redirect user to their own dashboard if they try to access unauthorized pages
             console.warn(`Access denied for role ${userRole} (id: ${userRoleId}). Allowed: ${allowedRoles}`);
 
-            if (userRole === 'admin' || userRole === 6 || userRoleId === 6) return <Navigate to="/admin" replace />;
-            if (userRole === 'super_admin' || userRole === 1 || userRoleId === 1) return <Navigate to="/super-admin" replace />;
-            if (userRole === 5 || userRoleId === 5) return <Navigate to="/rector" replace />;
-            if (userRole === 4 || userRoleId === 4) return <Navigate to="/faculty" replace />;
-            if (userRole === 2 || userRoleId === 2) return <Navigate to="/committee" replace />;
+            // Redirect user to their own dashboard based on roles (string names preferred)
+            if (normalizedUserRoles.includes('admin') || userRoleStr === 'admin') return <Navigate to="/admin" replace />;
+            if (normalizedUserRoles.includes('super_admin') || userRoleStr === 'super_admin') return <Navigate to="/super-admin" replace />;
+            if (normalizedUserRoles.includes('rector') || userRoleStr === 'rector') return <Navigate to="/rector" replace />;
+            if (normalizedUserRoles.includes('faculty') || userRoleStr === 'faculty') return <Navigate to="/faculty" replace />;
+            if (normalizedUserRoles.includes('committee') || userRoleStr === 'committee') return <Navigate to="/committee" replace />;
 
             return <Navigate to="/dashboard" replace />;
         }
