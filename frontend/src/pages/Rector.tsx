@@ -201,9 +201,9 @@ const Rector = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
                             {applications
                                 .filter(s => {
-                                    const step = (s.currentStep || '').toLowerCase();
+                                    const step = String(s.currentStep || '').toLowerCase();
                                     const status = (s.status || '').toLowerCase();
-                                    return step === 'rectorate' && status !== 'rejected';
+                                    return step === 'rector' && status !== 'rejected';
                                 })
                                 .length === 0 && (
                                     <div className="col-span-full text-center p-8 text-muted-foreground border-2 border-dashed rounded-xl">
@@ -215,7 +215,7 @@ const Rector = () => {
                                 .filter(s => {
                                     const step = (s.currentStep || '').toLowerCase();
                                     const status = (s.status || '').toLowerCase();
-                                    return step === 'rectorate' && status !== 'rejected';
+                                    return step === 'rector' && status !== 'rejected';
                                 })
                                 .map((app) => (
                                     <Card key={app.id} className="border border-border hover:shadow-lg transition-all duration-300 bg-card/50 backdrop-blur-sm">

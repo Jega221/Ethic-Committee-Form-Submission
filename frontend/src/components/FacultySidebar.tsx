@@ -6,5 +6,5 @@ const menuItems: MenuItem[] = [
 ];
 
 export function FacultySidebar() {
-  return <BaseSidebar menuItems={menuItems} currentRole="faculty" />;
+  return <BaseSidebar menuItems={menuItems} currentRole="faculty_admin" />;
 }

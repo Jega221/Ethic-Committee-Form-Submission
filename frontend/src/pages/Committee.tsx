@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { FacultySidebar } from "@/components/FacultySidebar";
+import { CommitteeSidebar } from "@/components/CommitteeSidebar";
 import { getAllApplications, processApplication, updateApplicationStatus, API_BASE_URL } from "@/lib/api";
 import { Loader } from "@/components/ui/loader";
 import { Badge } from "@/components/ui/badge";
@@ -152,15 +152,15 @@ const Committee = () => {
   }
 
   const pendingDecisions = decisions.filter(d => {
-    const step = (d.currentStep || '').toLowerCase();
+    const step = String(d.currentStep || '').toLowerCase();
     const status = (d.status || '').toLowerCase();
-    return step === 'committee' && status !== 'approved' && status !== 'rejected';
+    return step === 'committee_member' && status !== 'approved' && status !== 'rejected';
   });
 
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
-        <FacultySidebar />
+        <CommitteeSidebar />
 
         <main className="flex-1 p-6 overflow-auto">
           <SidebarTrigger className="mb-4" />

@@ -6,6 +6,14 @@ import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Badge } from '@/components/ui/badge';
 import { Loader } from '@/components/ui/loader';
 import { DocumentViewer } from '@/components/DocumentViewer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { getUserNotifications, markNotificationAsRead } from '@/lib/api';
 
 interface Document {
   type: string;
@@ -25,6 +33,8 @@ const UploadedFiles = () => {
   const [applications, setApplications] = useState<Application[]>([]);
   const [documentViewerOpen, setDocumentViewerOpen] = useState(false);
   const [currentDocument, setCurrentDocument] = useState<{ url: string; name: string; type: string } | null>(null);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   /* API Integration */
   const [loading, setLoading] = useState(true);
@@ -56,6 +66,17 @@ const UploadedFiles = () => {
           }));
 
           setApplications(mappedApps);
+
+          // Fetch Notifications
+          try {
+            // We can use the statically imported function effectively
+            const notifRes = await getUserNotifications(userProfile.id);
+            const notifs = notifRes.data;
+            setNotifications(notifs);
+            setUnreadCount(notifs.filter((n: any) => !n.is_read).length);
+          } catch (err) {
+            console.error("Failed to load notifications", err);
+          }
         }
       } catch (err) {
         console.error(err);
@@ -65,6 +86,16 @@ const UploadedFiles = () => {
     };
     fetchApplications();
   }, []);
+
+  const handleMarkAsRead = async (id: number) => {
+    try {
+      await markNotificationAsRead(id);
+      setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (err) {
+      console.error("Failed to mark notification as read", err);
+    }
+  };
 
   const handleDownload = async (url: string) => {
     try {
@@ -103,12 +134,57 @@ const UploadedFiles = () => {
                 </h1>
               </div>
 
-              <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
-                <Bell className="w-6 h-6 text-foreground" />
-                <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  1
-                </span>
-              </button>
+              <div className="flex items-center gap-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="relative p-2 hover:bg-accent rounded-lg transition-colors outline-none">
+                      <Bell className="w-6 h-6 text-foreground" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-80 p-0">
+                    <DropdownMenuLabel className="p-4 border-b border-border">
+                      <div className="flex items-center justify-between">
+                        <span>Notifications</span>
+                        <span className="text-xs text-muted-foreground">{unreadCount} unread</span>
+                      </div>
+                    </DropdownMenuLabel>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center text-sm text-muted-foreground">
+                          No notifications
+                        </div>
+                      ) : (
+                        notifications.map((notif: any) => (
+                          <DropdownMenuItem
+                            key={notif.id}
+                            className={`p-4 border-b border-border last:border-0 cursor-pointer ${!notif.is_read ? 'bg-muted/50' : ''}`}
+                            onClick={() => handleMarkAsRead(notif.id)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={`mt-1 p-1.5 rounded-full ${notif.is_read ? 'bg-slate-100' : 'bg-blue-100'}`}>
+                                <Bell className={`w-3 h-3 ${notif.is_read ? 'text-slate-500' : 'text-blue-600'}`} />
+                              </div>
+                              <div className="flex-1 space-y-1">
+                                <p className={`text-sm ${!notif.is_read ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                  {notif.message}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {new Date(notif.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                          </DropdownMenuItem>
+                        ))
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </header>
 

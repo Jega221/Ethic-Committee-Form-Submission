@@ -56,6 +56,12 @@ const Faculty = () => {
 
       // Filter for applications currently at 'faculty' step
       // Also map backend data to UI model
+      if (!Array.isArray(res.data)) {
+        console.error("API response is not an array:", res.data);
+        setStudents([]);
+        return;
+      }
+
       const mapped: StudentSubmission[] = res.data
         // .filter((app: any) => app.current_step === 'faculty') // Only show faculty step apps
         .map((app: any) => ({
@@ -212,9 +218,9 @@ const Faculty = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
               {students
                 .filter(s => {
-                  const step = (s.currentStep || '').toLowerCase();
-                  const status = (s.status || '').toLowerCase();
-                  return step === 'faculty' && status !== 'approved' && status !== 'rejected';
+                  const step = String(s.currentStep || '').toLowerCase();
+                  const status = String(s.status || '').toLowerCase();
+                  return step === 'faculty_admin' && status === 'pending';
                 })
                 .length === 0 && (
                   <div className="col-span-full text-center p-8 text-muted-foreground">
@@ -226,7 +232,7 @@ const Faculty = () => {
                 .filter(s => {
                   const step = (s.currentStep || '').toLowerCase();
                   const status = (s.status || '').toLowerCase();
-                  return step === 'faculty' && status !== 'approved' && status !== 'rejected';
+                  return step === 'faculty_admin' && status === 'pending';
                 })
                 .map((student) => (
                   <Card key={student.id} className="border border-border hover:shadow-lg transition-shadow">

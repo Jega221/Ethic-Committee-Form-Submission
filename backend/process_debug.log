@@ -1,0 +1,37 @@
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 29
+AUTH: UserID=24 CurrentStep=faculty_admin Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+ERROR: Current step 'faculty_admin' not part of workflow: []
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 29
+AUTH: UserID=24 CurrentStep=faculty_admin Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+ERROR: Current step 'faculty_admin' not part of workflow: []
+AUTH: UserID=24 CurrentStep=rector Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='Admin' -> Mapped='rectorate' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 19
+AUTH: UserID=24 CurrentStep=committee_member Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+ERROR: Current step 'committee_member' not part of workflow: []
+AUTH: UserID=24 CurrentStep=rectorate Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='Admin' -> Mapped='rectorate' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 29
+AUTH: UserID=24 CurrentStep=faculty_admin Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='committee_member' -> Mapped='committee' | RawFollow='rector' -> Mapped='rectorate'
+AUTH: UserID=24 CurrentStep=rectorate Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='done' -> Mapped='done' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 19
+AUTH: UserID=24 CurrentStep=committee_member Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='rector' -> Mapped='rectorate' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 29
+AUTH: UserID=24 CurrentStep=committee Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='rector' -> Mapped='rectorate' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 29
+AUTH: UserID=24 CurrentStep=rectorate Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='done' -> Mapped='done' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 19
+AUTH: UserID=24 CurrentStep=rectorate Roles=["researcher","rector","committee_member","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='done' -> Mapped='done' | RawFollow='null' -> Mapped='null'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 25
+AUTH: UserID=10 CurrentStep=faculty_admin Roles=["faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='committee_member' -> Mapped='committee' | RawFollow='rector' -> Mapped='rectorate'
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 24
+AUTH: UserID=10 CurrentStep=faculty_admin Roles=["faculty_admin"] HasAccess=true
+INFO: Workflow is no_in_use (not current), but proceeding for existing application 23
+AUTH: UserID=10 CurrentStep=faculty_admin Roles=["faculty_admin"] HasAccess=true

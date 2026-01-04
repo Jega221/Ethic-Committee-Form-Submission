@@ -102,8 +102,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, allowedRoles 
             if (normalizedUserRoles.includes('admin') || userRoleStr === 'admin') return <Navigate to="/admin" replace />;
             if (normalizedUserRoles.includes('super_admin') || userRoleStr === 'super_admin') return <Navigate to="/super-admin" replace />;
             if (normalizedUserRoles.includes('rector') || userRoleStr === 'rector') return <Navigate to="/rector" replace />;
-            if (normalizedUserRoles.includes('faculty') || userRoleStr === 'faculty') return <Navigate to="/faculty" replace />;
-            if (normalizedUserRoles.includes('committee') || userRoleStr === 'committee') return <Navigate to="/committee" replace />;
+            if (normalizedUserRoles.includes('faculty') || normalizedUserRoles.includes('faculty_admin') || userRoleStr === 'faculty' || userRoleStr === 'faculty_admin') return <Navigate to="/faculty" replace />;
+            if (normalizedUserRoles.includes('committee') || normalizedUserRoles.includes('committee_member') || userRoleStr === 'committee' || userRoleStr === 'committee_member') return <Navigate to="/committee" replace />;
 
             return <Navigate to="/dashboard" replace />;
         }

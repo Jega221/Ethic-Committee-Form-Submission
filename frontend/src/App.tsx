@@ -39,15 +39,15 @@ const App = () => (
           <Route path="/new-application" element={<ProtectedRoute allowedRoles={['researcher']}><NewApplication /></ProtectedRoute>} />
           <Route path="/uploaded-files" element={<ProtectedRoute allowedRoles={['researcher']}><UploadedFiles /></ProtectedRoute>} />
           <Route path="/study-status" element={<ProtectedRoute allowedRoles={['researcher']}><StudyStatus /></ProtectedRoute>} />
-          <Route path="/agenda" element={<ProtectedRoute allowedRoles={['researcher']}><Agenda /></ProtectedRoute>} />
-          <Route path="/settings" element={<ProtectedRoute allowedRoles={['researcher']}><Settings /></ProtectedRoute>} />
+          <Route path="/agenda" element={<ProtectedRoute allowedRoles={['researcher', 'faculty_admin', 'committee_member', 'rector', 'admin', 'super_admin']}><Agenda /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute allowedRoles={['researcher', 'faculty_admin', 'committee_member', 'rector', 'admin', 'super_admin']}><Settings /></ProtectedRoute>} />
 
           <Route path="/admin" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/admin/review-oversight" element={<ProtectedRoute allowedRoles={['admin']}><ReviewOversight /></ProtectedRoute>} />
 
-          <Route path="/faculty" element={<ProtectedRoute allowedRoles={['faculty']}><Faculty /></ProtectedRoute>} />
-          <Route path="/committee" element={<ProtectedRoute allowedRoles={['committee']}><Committee /></ProtectedRoute>} />
+          <Route path="/faculty" element={<ProtectedRoute allowedRoles={['faculty', 'faculty_admin']}><Faculty /></ProtectedRoute>} />
+          <Route path="/committee" element={<ProtectedRoute allowedRoles={['committee', 'committee_member']}><Committee /></ProtectedRoute>} />
           <Route path="/rector" element={<ProtectedRoute allowedRoles={['rector']}><Rector /></ProtectedRoute>} />
           <Route path="/super-admin" element={<ProtectedRoute allowedRoles={['super_admin']}><SuperAdminPortal /></ProtectedRoute>} />
 

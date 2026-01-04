@@ -87,7 +87,7 @@ const Login = () => {
         navigate('/admin');
       } else if (normalizedRoles.includes('rector') || normalizedUserRole === 'rector') {
         navigate('/rector');
-      } else if (normalizedRoles.includes('faculty') || normalizedUserRole === 'faculty') {
+      } else if (normalizedRoles.includes('faculty') || normalizedRoles.includes('faculty_admin') || normalizedUserRole === 'faculty' || normalizedUserRole === 'faculty_admin') {
         navigate('/faculty');
       } else if (normalizedRoles.includes('committee') || normalizedUserRole === 'committee') {
         navigate('/committee');

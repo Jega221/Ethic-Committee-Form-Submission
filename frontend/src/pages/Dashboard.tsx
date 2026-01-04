@@ -83,7 +83,7 @@ const Dashboard = () => {
 
         // 1. Fetch Applications
         const res = await getResearcherApplications(user.id);
-        const apps = res.data;
+        const apps = Array.isArray(res.data) ? res.data : [];
 
         // Stats
         const counts = {
@@ -126,7 +126,7 @@ const Dashboard = () => {
         // 2. Fetch Notifications
         try {
           const notifRes = await getUserNotifications(user.id);
-          const notifs = notifRes.data;
+          const notifs = Array.isArray(notifRes.data) ? notifRes.data : [];
           setNotifications(notifs);
           setUnreadCount(notifs.filter((n: any) => !n.is_read).length);
         } catch (err) {

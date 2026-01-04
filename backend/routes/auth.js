@@ -47,9 +47,12 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    // 1️⃣ Find user
+    // 1️⃣ Find user with faculty info
     const userResult = await pool.query(
-      'SELECT * FROM users WHERE email = $1',
+      `SELECT u.*, f.name as faculty_name 
+       FROM users u 
+       LEFT JOIN faculties f ON u.faculty_id = f.id 
+       WHERE u.email = $1`,
       [email]
     );
 
@@ -82,7 +85,18 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign({ id: user.id, email: user.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // 5️⃣ Response
-    res.json({ token, user: { id: user.id, name: user.name, email: user.email, roles } });
+    res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        surname: user.surname,
+        email: user.email,
+        faculty_id: user.faculty_id,
+        faculty: user.faculty_name,
+        roles
+      }
+    });
 
     console.log(`id: ${user.id} name: ${user.name} logged in`);
 
@@ -138,7 +152,10 @@ function authenticateToken(req, res, next) {
 
 // Profile modification endpoint
 router.put('/profile', authenticateToken, async (req, res) => {
-  const { name, surname, email, password } = req.body;
+  console.log('PUT /profile called');
+  console.log('User:', req.user);
+  console.log('Body:', req.body);
+  const { name, surname, email, password, faculty_id } = req.body;
   const userId = req.user && req.user.id;
 
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
@@ -158,6 +175,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
     if (surname !== undefined) { fields.push(`surname = $${idx++}`); values.push(surname); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email); }
+    if (faculty_id !== undefined) { fields.push(`faculty_id = $${idx++}`); values.push(faculty_id); }
     if (password !== undefined) {
       const hashed = await bcrypt.hash(password, 10);
       fields.push(`password = $${idx++}`);
@@ -167,7 +185,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
 
     values.push(userId);
-    const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, surname, email`;
+    const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, surname, email, faculty_id`;
     const updateRes = await pool.query(query, values);
 
     const updated = updateRes.rows[0];
@@ -185,9 +203,24 @@ router.put('/profile', authenticateToken, async (req, res) => {
     // Regenerate token with roles
     const token = jwt.sign({ id: updated.id, email: updated.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
+    // Fetch faculty name for response
+    let facultyName = null;
+    if (updated.faculty_id) {
+      const facRes = await pool.query('SELECT name FROM faculties WHERE id = $1', [updated.faculty_id]);
+      if (facRes.rows.length > 0) facultyName = facRes.rows[0].name;
+    }
+
     res.json({
       token,
-      user: { id: updated.id, name: updated.name, surname: updated.surname, email: updated.email, roles }
+      user: {
+        id: updated.id,
+        name: updated.name,
+        surname: updated.surname,
+        email: updated.email,
+        faculty_id: updated.faculty_id,
+        faculty: facultyName,
+        roles
+      }
     });
   } catch (err) {
     console.error(err);

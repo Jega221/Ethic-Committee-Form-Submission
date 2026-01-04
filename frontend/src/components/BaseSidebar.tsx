@@ -53,8 +53,8 @@ export function BaseSidebar({
         const s = normalizeRole(r);
         if (!s) return s;
         if (s.includes('super')) return 'super_admin';
-        if (s.includes('faculty')) return 'faculty';
-        if (s.includes('committee')) return 'committee';
+        if (s.includes('faculty')) return 'faculty_admin';
+        if (s.includes('committee')) return 'committee_member';
         if (s.includes('rector')) return 'rector';
         if (s.includes('admin')) return 'admin';
         if (s.includes('research')) return 'researcher';
@@ -74,14 +74,14 @@ export function BaseSidebar({
 
     const defaultRoles = [
         { value: 'researcher', label: 'Researcher' },
-        { value: 'faculty', label: 'Faculty' },
-        { value: 'committee', label: 'Committee' },
+        { value: 'faculty_admin', label: 'Faculty' },
+        { value: 'committee_member', label: 'Committee' },
         { value: 'rector', label: 'Rector' },
         { value: 'admin', label: 'Admin' },
         { value: 'super_admin', label: 'Super Admin' },
     ];
 
-    const visibleRoles = (rolesFromProfile.length > 0) ? rolesFromProfile : (availableRoles && availableRoles.length > 0 ? availableRoles.map(r=>({value: normalizeRole(r.value), label: r.label})) : defaultRoles);
+    const visibleRoles = (rolesFromProfile.length > 0) ? rolesFromProfile : (availableRoles && availableRoles.length > 0 ? availableRoles.map(r => ({ value: normalizeRole(r.value), label: r.label })) : defaultRoles);
 
     const rawInitial = parsedProfile?.role ? normalizeRole(parsedProfile.role) : (currentRole ? normalizeRole(currentRole) : (visibleRoles[0]?.value || 'researcher'));
     const initialRole = canonicalRole(rawInitial);
@@ -118,8 +118,8 @@ export function BaseSidebar({
         // Role -> route mapping
         const roleRouteMap: Record<string, string> = {
             researcher: '/dashboard',
-            faculty: '/faculty',
-            committee: '/committee',
+            faculty_admin: '/faculty',
+            committee_member: '/committee',
             rector: '/rector',
             admin: '/admin',
             super_admin: '/super-admin'
@@ -153,23 +153,25 @@ export function BaseSidebar({
 
                 <Separator className="mb-6 opacity-50" />
 
-                {/* Quick Actions */}
-                <div className="flex gap-4 justify-center mb-6">
-                    <button
-                        onClick={() => handleNavigation('/settings')}
-                        className={`p-3 hover:bg-accent rounded-lg transition-all ${location.pathname === '/settings' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:scale-105'}`}
-                        title="Settings"
-                    >
-                        <Settings className="w-5 h-5" />
-                    </button>
-                    <button
-                        onClick={() => handleNavigation('/agenda')}
-                        className={`p-3 hover:bg-accent rounded-lg transition-all ${location.pathname === '/agenda' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:scale-105'}`}
-                        title="Agenda"
-                    >
-                        <Calendar className="w-5 h-5" />
-                    </button>
-                </div>
+                {/* Quick Actions - Hide for Admin and Super Admin */}
+                {!['admin', 'super_admin'].includes(selectedRole) && (
+                    <div className="flex gap-4 justify-center mb-6">
+                        <button
+                            onClick={() => handleNavigation('/settings')}
+                            className={`p-3 hover:bg-accent rounded-lg transition-all ${location.pathname === '/settings' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:scale-105'}`}
+                            title="Settings"
+                        >
+                            <Settings className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => handleNavigation('/agenda')}
+                            className={`p-3 hover:bg-accent rounded-lg transition-all ${location.pathname === '/agenda' ? 'bg-accent text-accent-foreground shadow-sm' : 'text-muted-foreground hover:scale-105'}`}
+                            title="Agenda"
+                        >
+                            <Calendar className="w-5 h-5" />
+                        </button>
+                    </div>
+                )}
             </SidebarHeader>
 
             <SidebarContent className="px-3">
@@ -181,8 +183,8 @@ export function BaseSidebar({
                                 <SidebarMenuButton
                                     onClick={() => handleNavigation(item.url)}
                                     className={`w-full justify-start gap-4 px-4 py-6 rounded-xl transition-all duration-200 ${isActive
-                                            ? 'bg-destructive/10 text-destructive font-bold shadow-sm border border-destructive/20'
-                                            : 'hover:bg-accent/50 text-slate-600 hover:translate-x-1'
+                                        ? 'bg-destructive/10 text-destructive font-bold shadow-sm border border-destructive/20'
+                                        : 'hover:bg-accent/50 text-slate-600 hover:translate-x-1'
                                         }`}
                                 >
                                     <item.icon className={`w-5 h-5 ${isActive ? 'text-destructive' : 'text-slate-400'}`} />

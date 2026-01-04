@@ -73,10 +73,18 @@ const Settings = () => {
   useEffect(() => {
     const loadFaculties = async () => {
       try {
+        console.log('Fetching faculties...');
         const data = await getPublicFaculties();
-        setFaculties(data);
+        console.log('Faculties fetched:', data);
+        if (Array.isArray(data)) {
+          setFaculties(data);
+        } else {
+          console.error('Faculties response is not an array:', data);
+          setFaculties([]);
+        }
       } catch (err) {
         console.error('Failed to load faculties:', err);
+        setFaculties([]);
       }
     };
     loadFaculties();
@@ -190,7 +198,7 @@ const Settings = () => {
         currentPassword: passwordForm.currentPassword,
         newPassword: passwordForm.newPassword,
       });
-      
+
       console.log('Password change response:', response);
 
       toast({
@@ -224,7 +232,7 @@ const Settings = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-secondary/30">
         <DashboardSidebar />
-        
+
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="bg-card border-b border-border px-4 py-4">
@@ -235,7 +243,7 @@ const Settings = () => {
                   Final International University Ethic committee
                 </h1>
               </div>
-              
+
               <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
                 <Bell className="w-6 h-6 text-foreground" />
                 <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -264,18 +272,6 @@ const Settings = () => {
 
               <div className="flex flex-col lg:flex-row gap-8">
                 {/* Avatar Section */}
-                <div className="flex flex-col items-center">
-                  <div className="relative">
-                    <Avatar className="w-24 h-24 bg-secondary">
-                      <AvatarFallback className="bg-secondary">
-                        <User className="w-12 h-12 text-muted-foreground" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <button className="absolute bottom-0 right-0 bg-primary text-primary-foreground rounded-full p-2 shadow-lg hover:bg-primary/90 transition-colors">
-                      <Camera className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
 
                 {/* Profile Details Grid */}
                 <div className="flex-1">
@@ -334,8 +330,8 @@ const Settings = () => {
                         <div className="grid grid-cols-2 gap-4 pt-4">
                           <div className="space-y-2">
                             <Label htmlFor="firstName">First Name *</Label>
-                            <Input 
-                              id="firstName" 
+                            <Input
+                              id="firstName"
                               value={editForm.name}
                               onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                               required
@@ -343,17 +339,17 @@ const Settings = () => {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="surname">Surname</Label>
-                            <Input 
-                              id="surname" 
+                            <Input
+                              id="surname"
                               value={editForm.surname}
                               onChange={(e) => setEditForm({ ...editForm, surname: e.target.value })}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="email">Email *</Label>
-                            <Input 
-                              id="email" 
-                              type="email" 
+                            <Input
+                              id="email"
+                              type="email"
                               value={editForm.email}
                               onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
                               required
@@ -362,25 +358,30 @@ const Settings = () => {
                           <div className="space-y-2">
                             <Label htmlFor="faculty">Faculty</Label>
                             <Select
-                              value={editForm.faculty_id?.toString() || ''}
-                              onValueChange={(value) => setEditForm({ ...editForm, faculty_id: value ? parseInt(value) : null })}
+                              value={editForm.faculty_id ? editForm.faculty_id.toString() : "empty_none"}
+                              onValueChange={(value) => {
+                                const newVal = (value === "empty_none" || value === "") ? null : parseInt(value);
+                                setEditForm({ ...editForm, faculty_id: newVal });
+                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue placeholder="Select faculty" />
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="">None</SelectItem>
-                                {faculties.map((faculty) => (
-                                  <SelectItem key={faculty.id} value={faculty.id.toString()}>
-                                    {faculty.name}
-                                  </SelectItem>
+                                <SelectItem value="empty_none">None</SelectItem>
+                                {Array.isArray(faculties) && faculties.map((faculty) => (
+                                  faculty && faculty.id ? (
+                                    <SelectItem key={faculty.id} value={faculty.id.toString()}>
+                                      {faculty.name}
+                                    </SelectItem>
+                                  ) : null
                                 ))}
                               </SelectContent>
                             </Select>
                           </div>
                         </div>
-                        <Button 
-                          className="w-full mt-4" 
+                        <Button
+                          className="w-full mt-4"
                           onClick={handleEditProfile}
                           disabled={isLoading}
                         >
@@ -400,9 +401,9 @@ const Settings = () => {
                         <div className="space-y-4 pt-4">
                           <div className="space-y-2">
                             <Label htmlFor="currentPassword">Current Password *</Label>
-                            <Input 
-                              id="currentPassword" 
-                              type="password" 
+                            <Input
+                              id="currentPassword"
+                              type="password"
                               value={passwordForm.currentPassword}
                               onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                               required
@@ -410,9 +411,9 @@ const Settings = () => {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="newPassword">New Password *</Label>
-                            <Input 
-                              id="newPassword" 
-                              type="password" 
+                            <Input
+                              id="newPassword"
+                              type="password"
                               value={passwordForm.newPassword}
                               onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                               required
@@ -420,17 +421,17 @@ const Settings = () => {
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="confirmPassword">Confirm New Password *</Label>
-                            <Input 
-                              id="confirmPassword" 
-                              type="password" 
+                            <Input
+                              id="confirmPassword"
+                              type="password"
                               value={passwordForm.confirmPassword}
                               onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                               required
                             />
                           </div>
                         </div>
-                        <Button 
-                          className="w-full mt-4" 
+                        <Button
+                          className="w-full mt-4"
                           onClick={handleChangePassword}
                           disabled={isLoading}
                         >

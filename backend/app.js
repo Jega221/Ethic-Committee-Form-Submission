@@ -24,7 +24,7 @@ const setRoleRouter = require('./routes/roles');
 const messagingRoutes = require('./routes/messaging');
 const facultyRouter = require('./routes/faculty');
 const workflowRouter = require('./routes/workflow');
-const processRouter = require('./routes/process');
+const { router: processRouter } = require('./routes/process');
 // const authMiddleware = require('./middlewares/authMiddleware'); // optional future use
 
 // === ROUTES SETUP ===

@@ -1,5 +1,6 @@
 const pool = require('../db/index');
 const path = require('path');
+const { mapToEnum } = require('../routes/process');
 
 /* 
   APPLICATION CONTROLLER (Updated for unified users + faculties schema)
@@ -65,17 +66,31 @@ async function submitApplication(req, res) {
     if (wfRes.rows.length > 0) {
       const workflow = wfRes.rows[0];
 
-      // User requested that all new applications MUST be approved by faculty first.
-      // We will initialize the current_step to 'faculty' regardless of the workflow first_step label,
-      // or assume the workflow steps are ordered and we find where 'faculty' is.
-      // For simplicity and to satisfy the immediate request:
-      const initialStep = 'faculty';
-      const nextStep = workflow.third_step; // Assuming second_step was 'faculty', third is next.
+      // Parse steps if string
+      const parseSteps = (s) => {
+        if (Array.isArray(s)) return s;
+        if (typeof s === 'string') {
+          return s.replace(/^{|}$/g, '')
+            .split(',')
+            .map(item => {
+              if (item.startsWith('"') && item.endsWith('"')) return item.slice(1, -1);
+              return item;
+            });
+        }
+        return [];
+      };
+
+      const steps = parseSteps(workflow.steps);
+      const initialStepRaw = steps[0];
+      const nextStepRaw = steps[1] || null;
+
+      const initialStep = mapToEnum(initialStepRaw);
+      const nextStep = mapToEnum(nextStepRaw);
 
       await pool.query(
         `INSERT INTO process (application_id, workflow_id, current_step, next_step)
          VALUES ($1, $2, $3, $4)`,
-        [application.application_id, workflow.id, initialStep, nextStep]
+        [application_id || application.application_id, workflow.id, initialStep, nextStep]
       );
     }
 
@@ -118,7 +133,21 @@ async function getAllApplications(req, res) {
       ORDER BY a.submission_date DESC;
     `);
 
-    res.json(result.rows);
+    const normalizeStep = (step) => {
+      const map = {
+        faculty: 'faculty_admin',
+        committee: 'committee_member',
+        rectorate: 'rector',
+      };
+      return map[step] || step;
+    };
+
+    const mappedRows = result.rows.map(row => ({
+      ...row,
+      current_step: normalizeStep(row.current_step)
+    }));
+
+    res.json(mappedRows);
   } catch (error) {
     console.error("Error fetching applications:", error.message);
     res.status(500).json({ error: "Failed to fetch applications" });

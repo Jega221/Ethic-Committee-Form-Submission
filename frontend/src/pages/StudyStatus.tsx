@@ -42,17 +42,17 @@ interface SubmittedApplication {
 
 const statusSteps = [
   { key: 'submitted', label: 'Submitted', color: 'bg-success' },
-  { key: 'faculty', label: 'Faculty Review', color: 'bg-info' },
-  { key: 'committee', label: 'Committee Review', color: 'bg-warning' },
-  { key: 'dean', label: 'Dean Decision', color: 'bg-primary' },
+  { key: 'faculty_admin', label: 'Faculty Review', color: 'bg-info' },
+  { key: 'committee_member', label: 'Committee Review', color: 'bg-warning' },
+  { key: 'rector', label: 'Rector Decision', color: 'bg-primary' },
 ];
 
 const getStatusIndex = (status: string): number => {
   const s = (status || '').toLowerCase();
-  if (s.includes('faculty')) return 1;
-  if (s.includes('committee') || s.includes('ethics')) return 2;
-  if (s.includes('dean')) return 3;
-  if (s.includes('approved') || s.includes('final')) return 4;
+  if (s === 'faculty_admin') return 1;
+  if (s === 'committee_member') return 2;
+  if (s === 'rector' || s === 'rectorate') return 3;
+  if (s === 'approved' || s === 'final' || s === 'done') return 4;
   return 0;
 };
 
@@ -125,7 +125,7 @@ export default function StudyStatus() {
 
         setApplications(mapped);
         // persist a client-side copy for offline/viewing older submissions
-        try { localStorage.setItem('submittedApplications', JSON.stringify(mapped)); } catch {}
+        try { localStorage.setItem('submittedApplications', JSON.stringify(mapped)); } catch { }
       } catch (err) {
         // fall back to localStorage
         const saved = localStorage.getItem('submittedApplications');
@@ -263,13 +263,12 @@ export default function StudyStatus() {
                       {statusSteps.map((step, index) => (
                         <div key={step.key} className="flex flex-col items-center relative z-10 flex-1">
                           <div
-                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${
-                              index < currentStatusIndex
-                                ? 'bg-success border-success text-success-foreground'
-                                : index === currentStatusIndex
+                            className={`w-10 h-10 rounded-full border-3 flex items-center justify-center transition-all duration-300 ${index < currentStatusIndex
+                              ? 'bg-success border-success text-success-foreground'
+                              : index === currentStatusIndex
                                 ? 'bg-destructive border-destructive text-destructive-foreground ring-4 ring-destructive/20'
                                 : 'bg-muted border-muted-foreground/30 text-muted-foreground'
-                            }`}
+                              }`}
                           >
                             {index < currentStatusIndex ? (
                               <CheckCircle className="w-5 h-5" />
@@ -277,13 +276,12 @@ export default function StudyStatus() {
                               <span className="text-sm font-semibold">{index + 1}</span>
                             )}
                           </div>
-                          <span className={`text-xs mt-3 text-center font-medium ${
-                            index < currentStatusIndex 
-                              ? 'text-success' 
-                              : index === currentStatusIndex 
-                              ? 'text-destructive' 
+                          <span className={`text-xs mt-3 text-center font-medium ${index < currentStatusIndex
+                            ? 'text-success'
+                            : index === currentStatusIndex
+                              ? 'text-destructive'
                               : 'text-muted-foreground'
-                          }`}>
+                            }`}>
                             {step.label}
                           </span>
                           {index === currentStatusIndex && (
