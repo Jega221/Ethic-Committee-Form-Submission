@@ -285,8 +285,8 @@ const SuperAdminPortal = () => {
     };
 
     const openEditWorkflow = (workflow: any) => {
-    setEditingWorkflow(workflow);
-    setNewWorkflowSteps(normalizeSteps(workflow.steps));
+        setEditingWorkflow(workflow);
+        setNewWorkflowSteps(normalizeSteps(workflow.steps));
     };
 
     const handleSetCurrentWorkflow = async (id: string | number) => {
@@ -497,9 +497,6 @@ const SuperAdminPortal = () => {
                                                 onChange={e => setSearchQuery(e.target.value)}
                                             />
                                         </div>
-                                        <Button onClick={() => setIsAddUserOpen(true)} className="bg-destructive hover:bg-destructive/90 w-full md:w-auto">
-                                            <Plus className="w-4 h-4 mr-2" /> Add User
-                                        </Button>
                                     </div>
                                     <Card className="border-none shadow-sm card-glass">
                                         <Table>
