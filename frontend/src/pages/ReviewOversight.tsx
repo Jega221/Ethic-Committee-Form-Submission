@@ -307,37 +307,7 @@ const ReviewOversight = () => {
                             >
                               <Eye className="w-4 h-4" />
                             </Button>
-                            {(app.status === 'pending' || app.status === 'under_review') && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleAction(app, 'approve')}
-                                  className="text-green-600 hover:text-green-700 hover:bg-green-50"
-                                  title="Approve"
-                                >
-                                  <CheckCircle className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleAction(app, 'reject')}
-                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                  title="Reject"
-                                >
-                                  <XCircle className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleAction(app, 'revision')}
-                                  className="text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                                  title="Request Revision"
-                                >
-                                  <MessageSquare className="w-4 h-4" />
-                                </Button>
-                              </>
-                            )}
+
                           </div>
                         </TableCell>
                       </TableRow>

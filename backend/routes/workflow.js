@@ -90,8 +90,14 @@ router.put('/:id', verifyToken, isSuperAdmin, async (req, res) => {
 router.delete('/:id', verifyToken, isSuperAdmin, async (req, res) => {
   const { id } = req.params;
   try {
+    const used = await pool.query(
+      'SELECT 1 FROM process WHERE workflow_id = $1 LIMIT 1',
+      [id]
+    );
+    if (used.rows.length > 0) {
+      return res.status(400).json({ message: 'Workflow in use, cannot delete' });
+    }
     const del = await pool.query('DELETE FROM workflow WHERE id = $1 RETURNING *', [id]);
-    if (del.rows.length === 0) return res.status(404).json({ message: 'Workflow not found' });
     res.json({ message: 'Workflow deleted', workflow: del.rows[0] });
   } catch (err) {
     console.error('delete workflow error:', err);

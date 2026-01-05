@@ -197,13 +197,13 @@ const SuperAdminPortal = () => {
 
     // Workflow Handlers
     const [isAddWorkflowOpen, setIsAddWorkflowOpen] = useState(false);
-    const DEFAULT_STEPS = ['committee_member', 'Faculty Admin', 'Rector'];
+    const DEFAULT_STEPS = ['committee_member', 'Faculty_admin', 'Rector'];
     const [newWorkflowSteps, setNewWorkflowSteps] = useState<string[]>(DEFAULT_STEPS);
     const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
 
     const stepOptions = [
         'committee_member',
-        'Faculty Admin',
+        'Faculty_admin',
         'Rector',
         'Admin'
     ];
@@ -211,7 +211,7 @@ const SuperAdminPortal = () => {
     const getStepLabel = (step: string): string => {
         const labels: Record<string, string> = {
             'committee_member': 'Ethic Committee',
-            'Faculty Admin': 'Faculty Review (Dean)',
+            'Faculty_admin': 'Faculty Review (Dean)',
             'Rector': 'Rectorate Approval',
             'Admin': 'Administrator Review'
         };
