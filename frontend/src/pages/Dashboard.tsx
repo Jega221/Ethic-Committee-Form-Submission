@@ -453,10 +453,6 @@ const Dashboard = () => {
             </div>
           </main>
 
-          {/* Help Button */}
-          <button className="fixed bottom-8 right-8 bg-destructive text-white p-4 rounded-full shadow-2xl hover:scale-110 active:scale-95 transition-all z-40">
-            <HelpCircle className="w-6 h-6" />
-          </button>
         </div>
       </div>
     </SidebarProvider>

@@ -244,12 +244,6 @@ const Settings = () => {
                 </h1>
               </div>
 
-              <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
-                <Bell className="w-6 h-6 text-foreground" />
-                <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  1
-                </span>
-              </button>
             </div>
           </header>
 
@@ -444,11 +438,6 @@ const Settings = () => {
               </div>
             </div>
           </main>
-
-          {/* Help Button */}
-          <button className="fixed bottom-8 right-8 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors">
-            <HelpCircle className="w-6 h-6" />
-          </button>
         </div>
       </div>
     </SidebarProvider>

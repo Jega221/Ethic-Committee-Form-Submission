@@ -71,7 +71,7 @@ const Agenda = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-secondary/30">
         <DashboardSidebar />
-        
+
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <header className="bg-card border-b border-border px-4 py-4">
@@ -82,13 +82,8 @@ const Agenda = () => {
                   Final International University Ethic committee
                 </h1>
               </div>
-              
-              <button className="relative p-2 hover:bg-accent rounded-lg transition-colors">
-                <Bell className="w-6 h-6 text-foreground" />
-                <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                  1
-                </span>
-              </button>
+
+
             </div>
           </header>
 
@@ -107,7 +102,7 @@ const Agenda = () => {
                 <p className="text-sm text-muted-foreground mb-6">
                   Select a date to view and add tasks
                 </p>
-                
+
                 <Calendar
                   mode="single"
                   selected={selectedDate}
@@ -127,7 +122,7 @@ const Agenda = () => {
                       {format(selectedDate, 'EEEE, MMMM d, yyyy')}
                     </p>
                   </div>
-                  
+
                   <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                     <DialogTrigger asChild>
                       <Button className="gap-2">
@@ -209,9 +204,7 @@ const Agenda = () => {
           </main>
 
           {/* Help Button */}
-          <button className="fixed bottom-8 right-8 bg-primary text-primary-foreground p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors">
-            <HelpCircle className="w-6 h-6" />
-          </button>
+
         </div>
       </div>
     </SidebarProvider>
