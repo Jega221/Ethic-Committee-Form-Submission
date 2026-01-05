@@ -89,8 +89,8 @@ async function submitApplication(req, res) {
 
       await pool.query(
         `INSERT INTO process (application_id, workflow_id, current_step, next_step)
-         VALUES ($1, $2, $3, $4)`,
-        [application_id || application.application_id, workflow.id, initialStep, nextStep]
+        VALUES ($1, $2, $3, $4)`,
+        [application.application_id, workflow.id, initialStep, nextStep]
       );
     }
 
