@@ -197,23 +197,22 @@ const SuperAdminPortal = () => {
 
     // Workflow Handlers
     const [isAddWorkflowOpen, setIsAddWorkflowOpen] = useState(false);
-    const DEFAULT_STEPS = ['committee_member', 'Faculty_admin', 'Rector'];
+    const DEFAULT_STEPS = ['committee_member', 'faculty_admin', 'rector'];
     const [newWorkflowSteps, setNewWorkflowSteps] = useState<string[]>(DEFAULT_STEPS);
     const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
 
     const stepOptions = [
         'committee_member',
-        'Faculty_admin',
-        'Rector',
-        'Admin'
+        'faculty_admin',
+        'rector',
     ];
+
 
     const getStepLabel = (step: string): string => {
         const labels: Record<string, string> = {
             'committee_member': 'Ethic Committee',
-            'Faculty_admin': 'Faculty Review (Dean)',
-            'Rector': 'Rectorate Approval',
-            'Admin': 'Administrator Review'
+            'faculty_admin': 'Faculty Review (Dean)',
+            'rector': 'Rectorate Approval',
         };
         return labels[step] || step;
     };
@@ -247,7 +246,7 @@ const SuperAdminPortal = () => {
             await createWorkflow(payload);
             toast.success("Workflow created successfully");
             setIsAddWorkflowOpen(false);
-            setNewWorkflowSteps(['committee_member', 'Faculty Admin', 'Rector']);
+            setNewWorkflowSteps(['committee_member', 'faculty_admin', 'rector']);
             fetchAllData();
         } catch (err: any) {
             toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to create workflow");
@@ -266,7 +265,7 @@ const SuperAdminPortal = () => {
             await updateWorkflow(editingWorkflow.id, payload);
             toast.success("Workflow updated successfully");
             setEditingWorkflow(null);
-            setNewWorkflowSteps(['committee_member', 'Faculty Admin', 'Rector']);
+            setNewWorkflowSteps(['committee_member', 'faculty_admin', 'rector']);
             fetchAllData();
         } catch (err: any) {
             toast.error(err.response?.data?.message || err.response?.data?.error || "Failed to update workflow");
@@ -677,11 +676,11 @@ const SuperAdminPortal = () => {
                             <Select value={newUser.role} onValueChange={r => setNewUser({ ...newUser, role: r })}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Admin">Admin</SelectItem>
-                                    <SelectItem value="Committee Member">Committee Member</SelectItem>
-                                    <SelectItem value="Researcher">Researcher</SelectItem>
-                                    <SelectItem value="Faculty Admin">Faculty Admin</SelectItem>
-                                    <SelectItem value="Rector">Rector</SelectItem>
+                                    <SelectItem value="admin">Admin</SelectItem>
+                                    <SelectItem value="committee_member">Committee Member</SelectItem>
+                                    <SelectItem value="researcher">Researcher</SelectItem>
+                                    <SelectItem value="faculty_admin">Faculty Admin</SelectItem>
+                                    <SelectItem value="rector">Rector</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

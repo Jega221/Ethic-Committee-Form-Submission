@@ -203,8 +203,6 @@ const Agenda = () => {
             </div>
           </main>
 
-          {/* Help Button */}
-
         </div>
       </div>
     </SidebarProvider>
