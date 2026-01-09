@@ -13,7 +13,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getUserNotifications, markNotificationAsRead } from '@/lib/api';
+import { API_BASE_URL, getUserNotifications, markNotificationAsRead } from '@/lib/api';
 
 interface Document {
   type: string;
@@ -97,14 +97,33 @@ const UploadedFiles = () => {
     }
   };
 
-  const handleDownload = async (url: string) => {
-    try {
-      const { API_BASE_URL } = await import('@/lib/api');
-      window.open(`${API_BASE_URL}/${url}`, '_blank');
-    } catch (err) {
-      console.error("Download error:", err);
+  const handleDownload = async (fileUrl: string, fileName: string) => {
+    const token = localStorage.getItem('token');
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/files/download?fileUrl=${encodeURIComponent(fileUrl)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error('Download failed');
     }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+
+    window.URL.revokeObjectURL(url);
   };
+
 
   const getStatusColor = (status: string) => {
     const s = (status || '').toLowerCase();
@@ -120,33 +139,33 @@ const UploadedFiles = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full bg-secondary/30">
+      <div className="min-h-screen flex w-full bg-secondary/30 overflow-x-hidden">
         <DashboardSidebar />
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col overflow-x-hidden min-w-0">
           {/* Header */}
-          <header className="bg-card border-b border-border px-4 py-4">
-            <div className="flex items-center justify-between max-w-7xl mx-auto">
-              <div className="flex items-center gap-4">
+          <header className="bg-card border-b border-border px-3 sm:px-4 py-3 sm:py-4">
+            <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
+              <div className="flex items-center gap-2 sm:gap-4">
                 <SidebarTrigger className="p-2 hover:bg-accent rounded-lg transition-colors" />
-                <h1 className="text-base font-normal text-foreground hidden sm:block">
+                <h1 className="text-sm sm:text-base font-normal text-foreground hidden sm:block">
                   Final International University Ethic committee
                 </h1>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <button className="relative p-2 hover:bg-accent rounded-lg transition-colors outline-none">
-                      <Bell className="w-6 h-6 text-foreground" />
+                    <button className="relative p-1.5 sm:p-2 hover:bg-accent rounded-lg transition-colors outline-none">
+                      <Bell className="w-5 h-5 sm:w-6 sm:h-6 text-foreground" />
                       {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center border-2 border-white">
+                        <span className="absolute top-0 right-0 sm:top-1 sm:right-1 bg-destructive text-destructive-foreground text-xs rounded-full w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center border-2 border-white">
                           {unreadCount}
                         </span>
                       )}
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-80 p-0">
+                  <DropdownMenuContent align="end" className="w-[calc(100vw-2rem)] sm:w-80 p-0">
                     <DropdownMenuLabel className="p-4 border-b border-border">
                       <div className="flex items-center justify-between">
                         <span>Notifications</span>
@@ -189,37 +208,39 @@ const UploadedFiles = () => {
           </header>
 
           {/* Main Content */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-foreground">
+          <main className="flex-1 w-full max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-8 overflow-x-hidden">
+            <div className="mb-4 sm:mb-6">
+              <h2 className="text-xl sm:text-2xl font-semibold text-foreground">
                 Uploaded Files
               </h2>
-              <p className="text-base text-muted-foreground mt-1">
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">
                 View all documents uploaded for your research studies
               </p>
             </div>
 
             {/* Applications List */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {applications.length > 0 ? (
                 applications.map((application) => (
                   <div
                     key={application.id}
-                    className="bg-card rounded-lg shadow-sm border border-border p-6"
+                    className="bg-card rounded-lg shadow-sm border border-border p-4 sm:p-6"
                   >
                     {/* Application Header */}
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-foreground">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4 mb-4">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <h3 className="text-base sm:text-lg font-semibold text-foreground truncate break-words">
                           {application.title}
                         </h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {application.id} • Submitted: {application.submittedDate}
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1 break-words">
+                          <span className="block sm:inline break-all">{application.id}</span>
+                          <span className="hidden sm:inline"> • </span>
+                          <span className="block sm:inline">Submitted: {application.submittedDate}</span>
                         </p>
                       </div>
                       <Badge
                         variant="outline"
-                        className={`whitespace-nowrap self-start ${getStatusColor(application.status)}`}
+                        className={`whitespace-nowrap self-start text-xs sm:text-sm ${getStatusColor(application.status)}`}
                       >
                         {application.status}
                       </Badge>
@@ -227,27 +248,27 @@ const UploadedFiles = () => {
 
                     {/* Documents List */}
                     <div>
-                      <p className="text-sm text-muted-foreground mb-3">
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-2 sm:mb-3">
                         Uploaded Documents:
                       </p>
                       <div className="space-y-2">
                         {application.documents.map((doc, index) => (
                           <div
                             key={index}
-                            className="flex items-center justify-between py-3 px-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
+                            className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 sm:px-4 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
                           >
-                            <div className="flex items-center gap-3">
-                              <FileText className="w-5 h-5 text-muted-foreground" />
-                              <div>
-                                <p className="text-sm font-medium text-foreground">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 overflow-hidden">
+                              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground flex-shrink-0" />
+                              <div className="flex-1 min-w-0 overflow-hidden">
+                                <p className="text-xs sm:text-sm font-medium text-foreground truncate break-words">
                                   {doc.type}
                                 </p>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-xs text-muted-foreground truncate break-all">
                                   {doc.fileName}
                                 </p>
                               </div>
                             </div>
-                            <div className="flex gap-4">
+                            <div className="flex gap-3 sm:gap-4 justify-end sm:justify-start">
                               <button
                                 onClick={async () => {
                                   const { API_BASE_URL } = await import('@/lib/api');
@@ -258,25 +279,17 @@ const UploadedFiles = () => {
                                   });
                                   setDocumentViewerOpen(true);
                                 }}
-                                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
+                                className="text-primary hover:text-primary/80 text-xs sm:text-sm font-medium transition-colors flex items-center gap-1"
                               >
-                                <Eye className="w-4 h-4" />
-                                View
+                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">View</span>
                               </button>
                               <button
-                                onClick={async () => {
-                                  const { API_BASE_URL } = await import('@/lib/api');
-                                  const link = document.createElement('a');
-                                  link.href = `${API_BASE_URL}/${doc.url}`;
-                                  link.download = doc.fileName;
-                                  document.body.appendChild(link);
-                                  link.click();
-                                  document.body.removeChild(link);
-                                }}
-                                className="text-primary hover:text-primary/80 text-sm font-medium transition-colors flex items-center gap-1"
+                                onClick={() => handleDownload(doc.url, doc.fileName)}
+                                className="text-primary hover:text-primary/80 text-xs sm:text-sm font-medium transition-colors flex items-center gap-1"
                               >
-                                <Download className="w-4 h-4" />
-                                Download
+                                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <span className="hidden sm:inline">Download</span>
                               </button>
                             </div>
                           </div>
@@ -286,9 +299,9 @@ const UploadedFiles = () => {
                   </div>
                 ))
               ) : (
-                <div className="bg-card rounded-lg shadow-sm border border-border p-8 text-center">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
+                <div className="bg-card rounded-lg shadow-sm border border-border p-6 sm:p-8 text-center">
+                  <FileText className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                  <p className="text-sm sm:text-base text-muted-foreground">
                     No documents uploaded yet. Submit an application to see your files here.
                   </p>
                 </div>

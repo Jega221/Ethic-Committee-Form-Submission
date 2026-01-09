@@ -12,7 +12,7 @@ const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_'
 
 // Signup route
 router.post('/signup', async (req, res) => {
-  const { name, surname, email, password } = req.body; // removed role_id
+  const { name, surname, email, password, faculty_id, role_id } = req.body;
 
   try {
     // check if user exists
@@ -24,18 +24,56 @@ router.post('/signup', async (req, res) => {
     // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // insert new user (no role handling here)
+    // insert new user with faculty_id
     const newUser = await pool.query(
-      'INSERT INTO users (name,surname, email, password) VALUES ($1, $2, $3, $4) RETURNING id, name, surname, email',
-      [name, surname, email, hashedPassword]
+      'INSERT INTO users (name, surname, email, password, faculty_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, surname, email, faculty_id',
+      [name, surname, email, hashedPassword, faculty_id || null]
     );
 
-    // generate JWT (no role)
-    const token = jwt.sign({ id: newUser.rows[0].id, email: newUser.rows[0].email }, process.env.JWT_SECRET, {
-      expiresIn: '1h',
-    });
+    const userId = newUser.rows[0].id;
 
-    res.json({ token, user: { id: newUser.rows[0].id, name: newUser.rows[0].name, email: newUser.rows[0].email } });
+    // Assign default role (researcher = 3, or use provided role_id)
+    const defaultRoleId = role_id || 3; // 3 = researcher
+    await pool.query(
+      'INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)',
+      [userId, defaultRoleId]
+    );
+
+    // Fetch the role name
+    const roleResult = await pool.query(
+      'SELECT r.role_name FROM roles r WHERE r.id = $1',
+      [defaultRoleId]
+    );
+    const roleName = roleResult.rows.length > 0 ? normalizeRole(roleResult.rows[0].role_name) : 'researcher';
+
+    // Fetch faculty name if faculty_id provided
+    let facultyName = null;
+    if (faculty_id) {
+      const facResult = await pool.query('SELECT name FROM faculties WHERE id = $1', [faculty_id]);
+      if (facResult.rows.length > 0) {
+        facultyName = facResult.rows[0].name;
+      }
+    }
+
+    // generate JWT with roles
+    const token = jwt.sign(
+      { id: userId, email: newUser.rows[0].email, roles: [roleName] },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    res.json({
+      token,
+      user: {
+        id: userId,
+        name: newUser.rows[0].name,
+        surname: newUser.rows[0].surname,
+        email: newUser.rows[0].email,
+        faculty_id: newUser.rows[0].faculty_id,
+        faculty: facultyName,
+        roles: [roleName]
+      }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });

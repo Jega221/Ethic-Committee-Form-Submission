@@ -74,10 +74,37 @@ import {
 } from 'recharts';
 
 const normalizeSteps = (steps: any): string[] => {
-    if (Array.isArray(steps)) return steps;
+    if (!steps) return [];
 
+    // Case 1: already an array
+    if (Array.isArray(steps)) {
+        return steps.map(s => String(s).trim());
+    }
+
+    // Case 2: JSON string
     if (typeof steps === 'string') {
-        return steps
+        const trimmed = steps.trim();
+
+        // PostgreSQL array format: {"a","b","c"}
+        if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+            return trimmed
+                .slice(1, -1)              // remove { }
+                .split(',')
+                .map(s => s.replace(/"/g, '').trim())
+                .filter(Boolean);
+        }
+
+        // JSON array string
+        if (trimmed.startsWith('[')) {
+            try {
+                return JSON.parse(trimmed);
+            } catch {
+                return [];
+            }
+        }
+
+        // Comma-separated string
+        return trimmed
             .split(',')
             .map(s => s.trim())
             .filter(Boolean);
@@ -85,6 +112,7 @@ const normalizeSteps = (steps: any): string[] => {
 
     return [];
 };
+
 
 
 const SuperAdminPortal = () => {
@@ -591,7 +619,7 @@ const SuperAdminPortal = () => {
                                                             {normalizeSteps(w.steps).map((step: string, idx: number) => (
                                                                 <React.Fragment key={idx}>
                                                                     <div className="bg-white border px-3 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider text-slate-600 shadow-sm capitalize">
-                                                                        {step}
+                                                                        {getStepLabel(step)}
                                                                     </div>
                                                                     {idx < (w.steps || []).length - 1 &&
                                                                         <ArrowRight className="w-4 h-4 text-slate-300" />

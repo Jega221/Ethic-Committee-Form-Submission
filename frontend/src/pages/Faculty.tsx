@@ -207,7 +207,7 @@ const Faculty = () => {
         <main className="flex-1 p-6 lg:p-10">
           <SidebarTrigger className="mb-4" />
 
-          <div className="w-full max-w-7xl mx-auto">
+          <div className="w-full max-w-7xl mx-auto">  
             {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl font-bold text-foreground">Document Review Portal (Faculty)</h1>

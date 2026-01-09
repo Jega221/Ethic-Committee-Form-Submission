@@ -25,6 +25,10 @@ const messagingRoutes = require('./routes/messaging');
 const facultyRouter = require('./routes/faculty');
 const workflowRouter = require('./routes/workflow');
 const { router: processRouter } = require('./routes/process');
+const fileRoutes = require('./routes/files');
+
+
+
 // const authMiddleware = require('./middlewares/authMiddleware'); // optional future use
 
 // === ROUTES SETUP ===
@@ -39,6 +43,7 @@ app.use('/api/messaging', messagingRoutes);
 app.use('/api/faculty', facultyRouter);
 app.use('/api/workflow', workflowRouter);
 app.use('/api/process', processRouter);
+app.use('/api/files', fileRoutes);
 
 
 
