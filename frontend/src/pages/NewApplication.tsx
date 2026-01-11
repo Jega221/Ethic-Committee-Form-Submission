@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, User, FileText, Users, Shield, Upload, CheckCircle, CheckCircle2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, User, FileText, Users, Shield, Upload, CheckCircle, CheckCircle2, Trash2 } from 'lucide-react';
 import { SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { DashboardSidebar } from '@/components/DashboardSidebar';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { createApplication } from '@/lib/api';
+import { createApplication, getApplicationDetails, modifyApplication } from '@/lib/api';
 import { z } from 'zod';
 
 const applicantSchema = z.object({
@@ -51,13 +51,18 @@ const researchSchema = z.object({
   if (data.startDate && data.endDate) {
     const end = new Date(data.endDate + 'T00:00:00');
     const start = new Date(data.startDate + 'T00:00:00');
-    if (end <= start) {
+
+    // Calculate minimum end date (start date + 3 weeks)
+    const minEndDate = new Date(start);
+    minEndDate.setDate(minEndDate.getDate() + 21);
+
+    if (end < minEndDate) {
       return false;
     }
   }
   return true;
 }, {
-  message: "End date must be after start date",
+  message: "End date must be at least 3 weeks after start date",
   path: ["endDate"],
 });
 
@@ -82,6 +87,9 @@ const submitSchema = z.object({
 
 const NewApplicationContent = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('edit');
+  const [existingDocuments, setExistingDocuments] = useState<any[]>([]);
   const { setOpen } = useSidebar();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('applicant');
@@ -152,11 +160,13 @@ const NewApplicationContent = () => {
     startDate: '',
     endDate: '',
   });
+  const [skipDocuments, setSkipDocuments] = useState(false);
 
+  // Auto-fill user information from localStorage
   // Auto-fill user information from localStorage
   useEffect(() => {
     setOpen(false);
-    
+
     // Load user profile and auto-fill form
     const userProfile = localStorage.getItem('userProfile');
     if (userProfile) {
@@ -173,7 +183,49 @@ const NewApplicationContent = () => {
         console.error('Error parsing user profile:', err);
       }
     }
-  }, [setOpen]);
+
+    if (editId) {
+      const fetchApp = async () => {
+        try {
+          const res = await getApplicationDetails(editId);
+          const app = res.data;
+
+          setApplicantData(prev => ({
+            ...prev,
+            email: app.email || prev.email,
+          }));
+
+          setResearchData({
+            projectTitle: app.title || '',
+            projectDescription: app.description || '',
+            researchType: app.research_type || '',
+            startDate: app.start_date || '',
+            endDate: app.end_date || '',
+            fundingSource: app.funding_source || '',
+          });
+
+          setParticipantsData({
+            participantCount: app.participant_count || '',
+            vulnerablePopulations: app.vulnerable_populations || '',
+            ageGroup: '',
+            recruitmentMethod: '',
+          });
+
+          setEthicsData({
+            riskAssessment: app.risk_level || '',
+            expectedBenefits: '',
+            informedConsent: true,
+            dataConfidentiality: app.data_protection === 'true' || app.data_protection === true,
+          });
+
+          setExistingDocuments(app.documents || []);
+        } catch (e) {
+          toast({ title: "Error", description: "Failed to load application for editing", variant: "destructive" });
+        }
+      }
+      fetchApp();
+    }
+  }, [setOpen, editId]);
 
   // Get today's date in YYYY-MM-DD format for date inputs
   const getTodayDate = () => {
@@ -268,8 +320,12 @@ const NewApplicationContent = () => {
     } else if (researchData.startDate) {
       const endDate = new Date(researchData.endDate + 'T00:00:00');
       const startDate = new Date(researchData.startDate + 'T00:00:00');
-      if (endDate <= startDate) {
-        errors.endDate = 'End date must be after start date';
+
+      const minEndDate = new Date(startDate);
+      minEndDate.setDate(minEndDate.getDate() + 21);
+
+      if (endDate < minEndDate) {
+        errors.endDate = 'End date must be at least 3 weeks after start date';
         hasErrors = true;
       }
     }
@@ -281,7 +337,7 @@ const NewApplicationContent = () => {
   const handleResearchNext = () => {
     // First validate dates
     const datesValid = validateDates();
-    
+
     if (!datesValid) {
       toast({
         title: "Date Validation Error",
@@ -302,9 +358,9 @@ const NewApplicationContent = () => {
         endDate: z.string().min(1, "End date is required"),
         fundingSource: z.string().trim().min(1, "Funding source is required").max(200),
       });
-      
+
       basicSchema.parse(researchData);
-      
+
       // If validation passes, proceed
       setActiveTab('participants');
       if (!unlockedTabs.includes('participants')) {
@@ -330,12 +386,44 @@ const NewApplicationContent = () => {
   };
 
   const handleDocumentsNext = () => {
+    // If skipping documents, bypass validation
+    if (skipDocuments) {
+      setActiveTab('submit');
+      if (!unlockedTabs.includes('submit')) {
+        setUnlockedTabs([...unlockedTabs, 'submit']);
+      }
+      return;
+    }
+
     // Count uploaded documents
     const uploadedDocs = Object.values(documentFiles).filter(file => file !== null);
-    const uploadedCount = uploadedDocs.length;
+    const existingCount = existingDocuments.length;
 
-    // Require at least 5 documents
-    if (uploadedCount < 5) {
+    // Backend Logic: If any new files are uploaded, ALL old files are deleted.
+    // So we must ensuring EITHER (uploaded > 0 AND uploaded >= 5) OR (uploaded == 0 AND existing >= 5)
+
+    let isValid = false;
+    let message = "";
+
+    if (uploadedDocs.length > 0) {
+      // User is replacing documents
+      if (uploadedDocs.length < 5) {
+        isValid = false;
+        message = `If you are updating documents, you must upload all 5 required files. You have uploaded ${uploadedDocs.length}.`;
+      } else {
+        isValid = true;
+      }
+    } else {
+      // User is keeping existing documents
+      if (existingCount < 5) {
+        isValid = false;
+        message = `You must have at least 5 documents. You have ${existingCount} existing documents.`;
+      } else {
+        isValid = true;
+      }
+    }
+
+    if (!isValid) {
       const docNames: Record<string, string> = {
         informedConsent: 'Informed Consent Form',
         researchProtocol: 'Research Protocol or Proposal',
@@ -343,14 +431,14 @@ const NewApplicationContent = () => {
         institutionalApprovals: 'Institutional Approvals',
         otherDocuments: 'Other Documents',
       };
-      
+
       const missingDocs = Object.entries(documentFiles)
         .filter(([_, file]) => !file)
         .map(([key, _]) => docNames[key as keyof typeof docNames]);
 
       toast({
         title: "Document Upload Required",
-        description: `You must upload at least 5 documents. Missing: ${missingDocs.join(', ')} (${uploadedCount}/5 uploaded)`,
+        description: `You must upload at least 5 documents. Missing: ${missingDocs.join(', ')} (${uploadedDocs.length}/5 uploaded). Or check 'Skip document upload'.`,
         variant: "destructive",
       });
       return;
@@ -382,9 +470,16 @@ const NewApplicationContent = () => {
       formData.append('title', researchData.projectTitle);
       formData.append('description', researchData.projectDescription);
 
-      // Append other fields as JSON or individual fields if needed by backend, 
-      // currently backend mainly uses title/desc/ids.
-      // If backend needs more fields, update backend schema or append here.
+      // Append missing fields
+      formData.append('research_type', researchData.researchType);
+      formData.append('start_date', researchData.startDate);
+      formData.append('end_date', researchData.endDate);
+      formData.append('funding_source', researchData.fundingSource);
+      formData.append('participant_count', participantsData.participantCount);
+      formData.append('vulnerable_populations', participantsData.vulnerablePopulations);
+      formData.append('risk_level', ethicsData.riskAssessment);
+      formData.append('data_protection', String(ethicsData.dataConfidentiality));
+      formData.append('skip_documents', String(skipDocuments));
 
       const filesToUpload = [
         documentFiles.informedConsent,
@@ -398,8 +493,14 @@ const NewApplicationContent = () => {
         if (file) formData.append('documents', file);
       });
 
-      const response = await createApplication(formData);
-      const newApp = response.data.application;
+      let response;
+      if (editId) {
+        response = await modifyApplication(editId, formData);
+      } else {
+        response = await createApplication(formData);
+      }
+
+      const newApp = response.data.application || response.data;
 
       setReferenceNumber(String(newApp.application_id)); // Use real ID
 
@@ -723,9 +824,16 @@ const NewApplicationContent = () => {
                         // Clear error when user changes date
                         setDateErrors(prev => ({ ...prev, startDate: '' }));
                         // If end date is before new start date, clear it and show error
-                        if (researchData.endDate && selectedDate && researchData.endDate <= selectedDate) {
-                          setResearchData(prev => ({ ...prev, endDate: '' }));
-                          setDateErrors(prev => ({ ...prev, endDate: 'End date must be after start date' }));
+                        if (researchData.endDate && selectedDate) {
+                          const start = new Date(selectedDate);
+                          const end = new Date(researchData.endDate);
+                          const minEndDate = new Date(start);
+                          minEndDate.setDate(minEndDate.getDate() + 21);
+
+                          if (end < minEndDate) {
+                            setResearchData(prev => ({ ...prev, endDate: '' }));
+                            setDateErrors(prev => ({ ...prev, endDate: 'End date must be at least 3 weeks after start date' }));
+                          }
                         }
                       }}
                       onBlur={() => {
@@ -780,8 +888,8 @@ const NewApplicationContent = () => {
                     )}
                     {!dateErrors.endDate && (
                       <p className="text-xs text-muted-foreground">
-                        {!researchData.startDate 
-                          ? 'Please select start date first' 
+                        {!researchData.startDate
+                          ? 'Please select start date first'
                           : 'End date must be after start date'}
                       </p>
                     )}
@@ -997,6 +1105,30 @@ const NewApplicationContent = () => {
               <h2 className="text-2xl font-semibold text-foreground mb-2">
                 Supporting Documents
               </h2>
+
+              {existingDocuments.length > 0 && (
+                <div className="mb-6 p-4 bg-muted/30 rounded-lg border border-border">
+                  <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-success" />
+                    Previously Uploaded Documents
+                  </h3>
+                  <div className="grid grid-cols-1 gap-2">
+                    {existingDocuments.map((doc, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-background border border-border rounded-md">
+                        <div className="flex items-center gap-3">
+                          <FileText className="w-4 h-4 text-primary" />
+                          <span className="text-sm font-medium">{doc.file_name}</span>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Existing</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    These documents are attached to your application. Total documents: {existingDocuments.length}. You can upload more below.
+                  </p>
+                </div>
+              )}
+
               <p className="text-muted-foreground mb-6">
                 Upload all required documents related to your research study. All 5 documents are mandatory.
               </p>
@@ -1214,6 +1346,17 @@ const NewApplicationContent = () => {
                   </AlertDescription>
                 </Alert>
 
+                <div className="flex items-center space-x-2 py-2">
+                  <Checkbox
+                    id="skipDocuments"
+                    checked={skipDocuments}
+                    onCheckedChange={(checked) => setSkipDocuments(checked as boolean)}
+                  />
+                  <Label htmlFor="skipDocuments" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Skip document upload (I do not need to upload any documents for this research)
+                  </Label>
+                </div>
+
                 <div className="flex justify-between pt-4">
                   <Button
                     type="button"
@@ -1225,11 +1368,11 @@ const NewApplicationContent = () => {
                   <Button
                     type="button"
                     onClick={handleDocumentsNext}
-                    disabled={Object.values(documentFiles).filter(f => f !== null).length < 5}
+                    disabled={!skipDocuments && Object.values(documentFiles).filter(f => f !== null).length < 5}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {Object.values(documentFiles).filter(f => f !== null).length < 5 
-                      ? `Upload ${5 - Object.values(documentFiles).filter(f => f !== null).length} more document(s)` 
+                    {Object.values(documentFiles).filter(f => f !== null).length < 5
+                      ? `Upload ${5 - Object.values(documentFiles).filter(f => f !== null).length} more document(s)`
                       : 'Next: Review & Submit'}
                   </Button>
                 </div>

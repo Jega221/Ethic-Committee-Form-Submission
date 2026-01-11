@@ -96,6 +96,16 @@ export async function createApplication(payload: FormData) {
   return api.post("/api/applications", payload);
 }
 
+// 6.5) Get single application details
+export async function getApplicationDetails(id: string | number) {
+  return api.get(`/api/applications/${id}`);
+}
+
+// 6.6) Modify application
+export async function modifyApplication(id: string | number, payload: FormData) {
+  return api.put(`/api/applications/${id}`, payload);
+}
+
 // 7) Get researcher applications
 export async function getResearcherApplications(userId: string | number) {
   return api.get(`/api/applications/researcher/${userId}`);
@@ -179,7 +189,7 @@ export async function setUserRole(userId: string | number, roleId: string | numb
   return api.put('/api/Role/setRole', { user_id: String(userId), role_id: Number(roleId) });
 }
 
-export async function setUserRoles(userId: string | number, roleIds: (string|number)[]) {
+export async function setUserRoles(userId: string | number, roleIds: (string | number)[]) {
   return api.put('/api/Role/setRoles', { user_id: String(userId), role_ids: roleIds.map(r => Number(r)) });
 }
 

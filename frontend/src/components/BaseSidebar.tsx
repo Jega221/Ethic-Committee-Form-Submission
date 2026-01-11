@@ -83,7 +83,18 @@ export function BaseSidebar({
 
     const visibleRoles = (rolesFromProfile.length > 0) ? rolesFromProfile : (availableRoles && availableRoles.length > 0 ? availableRoles.map(r => ({ value: normalizeRole(r.value), label: r.label })) : defaultRoles);
 
-    const rawInitial = parsedProfile?.role ? normalizeRole(parsedProfile.role) : (currentRole ? normalizeRole(currentRole) : (visibleRoles[0]?.value || 'researcher'));
+    // Determine initial role from URL first, then profile/prop/default
+    const getRoleFromUrl = (path: string) => {
+        if (path.startsWith('/faculty')) return 'faculty_admin';
+        if (path.startsWith('/committee')) return 'committee_member';
+        if (path.startsWith('/rector')) return 'rector';
+        if (path.startsWith('/admin')) return 'admin';
+        if (path.startsWith('/super-admin')) return 'super_admin';
+        return null;
+    };
+
+    const urlRole = getRoleFromUrl(location.pathname);
+    const rawInitial = urlRole || (parsedProfile?.role ? normalizeRole(parsedProfile.role) : (currentRole ? normalizeRole(currentRole) : (visibleRoles[0]?.value || 'researcher')));
     const initialRole = canonicalRole(rawInitial);
     const [selectedRole, setSelectedRole] = useState<string>(initialRole);
 

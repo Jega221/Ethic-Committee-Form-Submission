@@ -18,12 +18,30 @@ async function submitApplication(req, res) {
   const { faculty_id, committee_id, title, description } = req.body;
   const files = req.files || [];
 
+  console.log('--- Submit Application Debug ---');
+  console.log('User ID:', user_id);
+  console.log('Body:', req.body);
+  console.log('Files:', files.length);
+  console.log('Skip Documents:', req.body.skip_documents);
+  console.log('--------------------------------');
+
   // Checklist validation
-  if (!user_id || !faculty_id || !committee_id || !title || !description) {
-    return res.status(400).json({ error: "All form fields are required." });
+  const missingFields = [];
+  if (!user_id) missingFields.push('user_id');
+  if (!faculty_id) missingFields.push('faculty_id');
+  if (!committee_id) missingFields.push('committee_id');
+  if (!title) missingFields.push('title');
+  if (!description) missingFields.push('description');
+
+  if (missingFields.length > 0) {
+    console.log('Missing fields:', missingFields);
+    return res.status(400).json({ error: `Missing required fields: ${missingFields.join(', ')}` });
   }
 
-  if (!files.length || files.length < 1) {
+  // Allow skipping documents if flag is set
+  const skipDocuments = req.body.skip_documents === 'true' || req.body.skip_documents === true;
+
+  if ((!files.length || files.length < 1) && !skipDocuments) {
     return res.status(400).json({
       error: "At least 1 document is required."
     });
@@ -173,8 +191,8 @@ async function updateApplicationStatus(req, res) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    // Auto-archive approved or rejected
-    if (["Approved", "Rejected"].includes(status)) {
+    // Auto-archive approved ONLY (Rejected needs to go back to researcher)
+    if (status === "Approved") {
       await pool.query(`UPDATE application SET is_archived = TRUE WHERE application_id = $1`, [id]);
     }
 
@@ -253,7 +271,11 @@ async function getArchivedApplications(req, res) {
 // ✅ 6. Modify an existing application (only if status = 'Revision Requested')
 async function modifyApplication(req, res) {
   const { id } = req.params;
-  const { title, description } = req.body;
+  const {
+    title, description,
+    research_type, start_date, end_date, funding_source,
+    participant_count, vulnerable_populations, risk_level, data_protection
+  } = req.body;
   const files = req.files || [];
 
   try {
@@ -272,22 +294,29 @@ async function modifyApplication(req, res) {
       return res.status(403).json({ error: "Access denied. You can only modify your own applications." });
     }
 
-    // Only allowed when status = Revision Requested
-    if (app.status !== "Revision Requested") {
+    // Only allowed when status = Revision Requested or Rejected
+    if (app.status !== "Revision Requested" && app.status !== "Rejected") {
       return res.status(403).json({
-        error: "Application cannot be modified unless it is in 'Revision Requested' status."
+        error: "Application cannot be modified unless it is in 'Revision Requested' or 'Rejected' status."
       });
     }
 
-    // 2️⃣ Update title + description
+    // 2️⃣ Update all fields
     const updateQuery = `
       UPDATE application
-      SET title = $1, description = $2, status = 'Pending'
-      WHERE application_id = $3
+      SET title = $1, description = $2, status = 'Pending',
+          research_type = $3, start_date = $4, end_date = $5, funding_source = $6,
+          participant_count = $7, vulnerable_populations = $8, risk_level = $9, data_protection = $10
+      WHERE application_id = $11
       RETURNING *;
     `;
 
-    const updated = await pool.query(updateQuery, [title, description, id]);
+    const updated = await pool.query(updateQuery, [
+      title, description,
+      research_type, start_date, end_date, funding_source,
+      participant_count, vulnerable_populations, risk_level, data_protection,
+      id
+    ]);
 
     // 3️⃣ If new documents uploaded → replace old ones
     if (files.length > 0) {
@@ -322,6 +351,49 @@ async function modifyApplication(req, res) {
   }
 }
 
+// ✅ 7. Get single application by ID
+async function getApplicationById(req, res) {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      `SELECT 
+        a.*,
+        (
+          SELECT json_agg(json_build_object(
+            'document_id', d.document_id,
+            'file_name', d.file_name,
+            'file_type', d.file_type,
+            'file_url', d.file_url
+          ))
+          FROM documents d
+          WHERE d.application_id = a.application_id
+        ) AS documents
+       FROM application a
+       WHERE a.application_id = $1`,
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    const app = result.rows[0];
+
+    // Ownership check: Researchers can only view their own applications
+    // Admins/Super Admins/Staff can view all (assuming role 1, 2, 6 are privileged)
+    // We can just rely on basic check here matching getResearcherApplications logic or simpler
+    const isPrivileged = ['admin', 'super_admin', 'faculty_admin', 'chairman', 'member', 'rector'].includes(req.user.role) || [1, 2, 3, 4, 5, 6].includes(req.user.role);
+
+    if (!isPrivileged && app.researcher_id !== req.user.id) {
+      return res.status(403).json({ error: "Access denied. You can only view your own applications." });
+    }
+
+    res.json(app);
+  } catch (err) {
+    console.error("Error fetching application:", err);
+    res.status(500).json({ error: "Failed to fetch application" });
+  }
+}
 
 module.exports = {
   submitApplication,
@@ -329,5 +401,6 @@ module.exports = {
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
-  modifyApplication
+  modifyApplication,
+  getApplicationById
 };

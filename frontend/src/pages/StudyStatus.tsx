@@ -608,6 +608,24 @@ export default function StudyStatus() {
                                     </Button>
                                 </div>
 
+                                {['revision requested', 'rejected'].includes(currentApplication.status.toLowerCase()) && (
+                                    <div className="flex justify-center mb-8">
+                                        <Button
+                                            variant="default"
+                                            size="lg"
+                                            // Redirect to edit page or open edit modal
+                                            // For now, let's assume we use the same NewApplication page with state or a specific EditApplication route
+                                            // But since I don't see an edit route in recent files, I might need to check App.tsx or routes.
+                                            // I'll add a placeholder onClick for now or link to /new-application?edit={id}
+                                            onClick={() => window.location.href = `/new-application?edit=${currentApplication.id}`}
+                                            className="w-full md:w-1/2 py-6 bg-primary text-primary-foreground font-semibold hover:bg-primary/90 transition-all shadow-lg"
+                                        >
+                                            <FileText className="w-5 h-5 mr-2" />
+                                            Edit / Resubmit Application
+                                        </Button>
+                                    </div>
+                                )}
+
                                 <Card className="mb-8 border-border/50 shadow-sm">
                                     <CardContent className="p-5">
                                         <h2 className="text-primary font-semibold mb-4 flex items-center gap-2">
@@ -840,7 +858,7 @@ export default function StudyStatus() {
                         )}
                     </div>
                 </main>
-            </div>
-        </SidebarProvider>
+            </div >
+        </SidebarProvider >
     );
 }

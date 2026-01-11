@@ -35,3 +35,7 @@ INFO: Workflow is no_in_use (not current), but proceeding for existing applicati
 AUTH: UserID=10 CurrentStep=faculty_admin Roles=["faculty_admin"] HasAccess=true
 INFO: Workflow is no_in_use (not current), but proceeding for existing application 23
 AUTH: UserID=10 CurrentStep=faculty_admin Roles=["faculty_admin"] HasAccess=true
+AUTH: UserID=9 CurrentStep=faculty_admin Roles=["researcher","faculty_admin"] HasAccess=true
+APPROVE DEBUG: RawNext='committee_member' -> Mapped='committee_member' | RawFollow='null' -> Mapped='null'
+AUTH: UserID=11 CurrentStep=committee_member Roles=["committee_member"] HasAccess=true
+APPROVE DEBUG: RawNext='done' -> Mapped='done' | RawFollow='null' -> Mapped='null'

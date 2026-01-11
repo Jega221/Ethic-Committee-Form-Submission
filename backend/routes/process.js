@@ -234,6 +234,13 @@ router.post('/', async (req, res) => {
         [first, second, proc.id]
       );
 
+      // EXPLICITLY SET APPLICATION STATUS TO 'Rejected'
+      // This allows the researcher to see the status and re-submit/modify it
+      await pool.query(
+        `UPDATE application SET status = 'Rejected' WHERE application_id = $1`,
+        [application_id]
+      );
+
       return res.json({
         message: 'Process rejected and reset',
         process: update.rows[0]

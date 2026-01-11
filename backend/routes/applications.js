@@ -8,7 +8,8 @@ const {
   updateApplicationStatus,
   getApplicationReviews,
   getArchivedApplications,
-  modifyApplication
+  modifyApplication,
+  getApplicationById
 } = require('../controllers/applicationController');
 const pool = require('../db/index');
 const { verifyToken, isAdmin, isStaff } = require('../middlewares/superAdminMiddelware');
@@ -84,9 +85,12 @@ router.patch('/:id/status', verifyToken, updateApplicationStatus);
 // GET all reviews for one application
 router.get('/:id/reviews', verifyToken, getApplicationReviews);
 
+
 // Modify application (only if status = 'Revision Requested')
 router.put('/:id', verifyToken, upload.array('documents', 5), modifyApplication);
 
+// GET single application details
+router.get('/:id', verifyToken, getApplicationById);
 
 // GET archived applications
 router.get('/archived', verifyToken, getArchivedApplications);
