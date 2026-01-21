@@ -15,6 +15,7 @@ const Signup = () => {
   const [surname, setSurname] = useState('');
   const [faculty, setFaculty] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +34,16 @@ const Signup = () => {
     loadFaculties();
   }, []);
 
+  const validatePassword = (pwd: string): string | null => {
+    if (pwd.length < 8) return "Password must be at least 8 characters long.";
+    if (pwd.length > 128) return "Password must be less than 128 characters.";
+    if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
+    if (!/[a-z]/.test(pwd)) return "Password must contain at least one lowercase letter.";
+    if (!/[0-9]/.test(pwd)) return "Password must contain at least one number.";
+    if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one special character.";
+    return null;
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -46,6 +57,17 @@ const Signup = () => {
       return;
     }
 
+    // Validate password complexity
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      toast({
+        title: "Weak Password",
+        description: passwordError,
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -54,6 +76,7 @@ const Signup = () => {
         surname: surname,
         faculty_id: parseInt(faculty, 10), // Faculty selector now returns ID as string
         email: email,
+        phone: phone,
         password: password,
         role_id: 3, // Default researcher role
       };
@@ -180,6 +203,20 @@ const Signup = () => {
               </Select>
             </div>
 
+            {/* Phone Number */}
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-slate-700 font-medium">Phone Number</Label>
+              <Input
+                id="phone"
+                type="tel"
+                placeholder="+90 533 123 45 67"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                required
+                className="bg-white/50 border-white/50 focus:bg-white transition-all h-11"
+              />
+            </div>
+
             {/* Email */}
             <div className="space-y-2">
               <Label htmlFor="email" className="text-slate-700 font-medium">Email Address</Label>
@@ -221,6 +258,10 @@ const Signup = () => {
                   className="bg-white/50 border-white/50 focus:bg-white transition-all h-11"
                 />
               </div>
+            </div>
+
+            <div className="text-xs text-slate-500 mt-2 px-1">
+              Password must be at least 8 characters long and include an uppercase letter, a lowercase letter, a number, and a special character.
             </div>
 
             <Button

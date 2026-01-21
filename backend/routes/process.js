@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
+const { createNotification } = require('../utils/notifications');
 require('dotenv').config();
 
 // Helper to map template step names to database Enum values
@@ -60,9 +61,10 @@ router.post('/', async (req, res) => {
     ----------------------------------- */
     const procRes = await pool.query(
       `
-      SELECT p.*, w.steps, w.status AS workflow_status
+      SELECT p.*, w.steps, w.status AS workflow_status, a.researcher_id, a.title
       FROM process p
       JOIN workflow w ON p.workflow_id = w.id
+      JOIN application a ON p.application_id = a.application_id
       WHERE p.application_id = $1
       `,
       [application_id]
@@ -206,6 +208,17 @@ router.post('/', async (req, res) => {
         );
       }
 
+      // Notify Researcher
+      try {
+        const msg = newCurrent === 'done'
+          ? `Your application "${proc.title}" has been APPROVED!`
+          : `Your application "${proc.title}" has moved to step: ${newCurrent}.`;
+
+        await createNotification(proc.researcher_id, application_id, msg);
+      } catch (e) {
+        console.error('Notification failed', e);
+      }
+
       return res.json({
         message: 'Process approved' + (newCurrent === 'done' ? ' and application finalized' : ''),
         process: update.rows[0]
@@ -240,6 +253,15 @@ router.post('/', async (req, res) => {
         `UPDATE application SET status = 'Rejected' WHERE application_id = $1`,
         [application_id]
       );
+
+      // Notify Researcher
+      try {
+        await createNotification(
+          proc.researcher_id,
+          application_id,
+          `Your application "${proc.title}" has been REJECTED.`
+        );
+      } catch (e) { console.error('Notification failed', e); }
 
       return res.json({
         message: 'Process rejected and reset',
@@ -289,6 +311,15 @@ router.post('/', async (req, res) => {
         `,
         [first, second, proc.id]
       );
+
+      // Notify Researcher
+      try {
+        await createNotification(
+          proc.researcher_id,
+          application_id,
+          `Revision Requested for "${proc.title}": ${comment || 'No comment provided.'}`
+        );
+      } catch (e) { console.error('Notification failed', e); }
 
       return res.json({
         message: 'Revision requested and process reset',

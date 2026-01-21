@@ -1,5 +1,6 @@
 // backend/utils/notifications.js
 const pool = require('../db/index');
+const { sendEmail } = require('./sendEmail');
 
 /**
  * Creates a notification record in the database.
@@ -27,6 +28,16 @@ async function createNotification(userId, applicationId, message) {
     );
 
     console.log(`🔔 Notification created for researcher ${userId}`);
+    console.log(`🔔 Notification created for researcher ${userId}`);
+
+    // Send Email
+    const userRes = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length > 0) {
+      const email = userRes.rows[0].email;
+      const subject = "New Notification - Ethics Committee";
+      await sendEmail(email, subject, message);
+    }
+
     return result.rows[0];
   } catch (err) {
     console.error("❌ Failed to create notification:", err.message);

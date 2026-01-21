@@ -10,9 +10,20 @@ const router = express.Router();
 // Helper to normalize role strings (consistent with frontend)
 const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_').trim();
 
+// Password validation helper
+const validatePassword = (pwd) => {
+  if (!pwd || pwd.length < 8) return "Password must be at least 8 characters long.";
+  if (pwd.length > 128) return "Password must be less than 128 characters.";
+  if (!/[A-Z]/.test(pwd)) return "Password must contain at least one uppercase letter.";
+  if (!/[a-z]/.test(pwd)) return "Password must contain at least one lowercase letter.";
+  if (!/[0-9]/.test(pwd)) return "Password must contain at least one number.";
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(pwd)) return "Password must contain at least one special character.";
+  return null;
+};
+
 // Signup route
 router.post('/signup', async (req, res) => {
-  const { name, surname, email, password, faculty_id, role_id } = req.body;
+  const { name, surname, email, password, faculty_id, role_id, phone } = req.body;
 
   try {
     // check if user exists
@@ -21,13 +32,19 @@ router.post('/signup', async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    // Validate password
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      return res.status(400).json({ message: passwordError });
+    }
+
     // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // insert new user with faculty_id
+    // insert new user with faculty_id and phone_number
     const newUser = await pool.query(
-      'INSERT INTO users (name, surname, email, password, faculty_id) VALUES ($1, $2, $3, $4, $5) RETURNING id, name, surname, email, faculty_id',
-      [name, surname, email, hashedPassword, faculty_id || null]
+      'INSERT INTO users (name, surname, email, password, faculty_id, phone_number) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, surname, email, faculty_id, phone_number',
+      [name, surname, email, hashedPassword, faculty_id || null, phone || null]
     );
 
     const userId = newUser.rows[0].id;
@@ -55,9 +72,9 @@ router.post('/signup', async (req, res) => {
       }
     }
 
-    // generate JWT with roles
+    // generate JWT with roles and faculty_id
     const token = jwt.sign(
-      { id: userId, email: newUser.rows[0].email, roles: [roleName] },
+      { id: userId, email: newUser.rows[0].email, roles: [roleName], faculty_id: newUser.rows[0].faculty_id },
       process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
@@ -69,6 +86,7 @@ router.post('/signup', async (req, res) => {
         name: newUser.rows[0].name,
         surname: newUser.rows[0].surname,
         email: newUser.rows[0].email,
+        phone_number: newUser.rows[0].phone_number,
         faculty_id: newUser.rows[0].faculty_id,
         faculty: facultyName,
         roles: [roleName]
@@ -119,8 +137,8 @@ router.post('/login', async (req, res) => {
     const normalizeRole = (s) => String(s || '').toLowerCase().replace(/[- ]+/g, '_').trim();
     const roles = rolesResult.rows.map(r => normalizeRole(r.role_name)); // ['admin', 'committee_member', ...]
 
-    // 4️⃣ Generate JWT with roles array
-    const token = jwt.sign({ id: user.id, email: user.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // 4️⃣ Generate JWT with roles array and faculty_id
+    const token = jwt.sign({ id: user.id, email: user.email, roles, faculty_id: user.faculty_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // 5️⃣ Response
     res.json({
@@ -130,6 +148,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
         surname: user.surname,
         email: user.email,
+        phone: user.phone_number,
         faculty_id: user.faculty_id,
         faculty: user.faculty_name,
         roles
@@ -193,7 +212,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
   console.log('PUT /profile called');
   console.log('User:', req.user);
   console.log('Body:', req.body);
-  const { name, surname, email, password, faculty_id } = req.body;
+  const { name, surname, email, password, faculty_id, phone } = req.body;
   const userId = req.user && req.user.id;
 
   if (!userId) return res.status(401).json({ message: 'Unauthorized' });
@@ -213,8 +232,14 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (name !== undefined) { fields.push(`name = $${idx++}`); values.push(name); }
     if (surname !== undefined) { fields.push(`surname = $${idx++}`); values.push(surname); }
     if (email !== undefined) { fields.push(`email = $${idx++}`); values.push(email); }
+    if (phone !== undefined) { fields.push(`phone_number = $${idx++}`); values.push(phone); }
     if (faculty_id !== undefined) { fields.push(`faculty_id = $${idx++}`); values.push(faculty_id); }
     if (password !== undefined) {
+      // Validate password if it's being updated
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        return res.status(400).json({ message: passwordError });
+      }
       const hashed = await bcrypt.hash(password, 10);
       fields.push(`password = $${idx++}`);
       values.push(hashed);
@@ -223,7 +248,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
     if (fields.length === 0) return res.status(400).json({ message: 'No fields to update' });
 
     values.push(userId);
-    const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, surname, email, faculty_id`;
+    const query = `UPDATE users SET ${fields.join(', ')} WHERE id = $${idx} RETURNING id, name, surname, email, faculty_id, phone_number`;
     const updateRes = await pool.query(query, values);
 
     const updated = updateRes.rows[0];
@@ -238,8 +263,8 @@ router.put('/profile', authenticateToken, async (req, res) => {
     );
     const roles = rolesRes.rows.map(r => normalizeRole(r.role_name));
 
-    // Regenerate token with roles
-    const token = jwt.sign({ id: updated.id, email: updated.email, roles }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    // Regenerate token with roles and faculty_id
+    const token = jwt.sign({ id: updated.id, email: updated.email, roles, faculty_id: updated.faculty_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     // Fetch faculty name for response
     let facultyName = null;
@@ -255,6 +280,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
         name: updated.name,
         surname: updated.surname,
         email: updated.email,
+        phone: updated.phone_number,
         faculty_id: updated.faculty_id,
         faculty: facultyName,
         roles

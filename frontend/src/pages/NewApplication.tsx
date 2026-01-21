@@ -177,6 +177,7 @@ const NewApplicationContent = () => {
           firstName: parsed.firstName || parsed.name || '',
           lastName: parsed.surname || '',
           email: parsed.email || '',
+          phone: parsed.phone || parsed.phone_number || '', // Autofill phone
           department: parsed.faculty || '', // Use faculty name for department
         }));
       } catch (err) {

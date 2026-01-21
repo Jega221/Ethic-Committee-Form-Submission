@@ -1,6 +1,7 @@
 const pool = require('../db/index');
 const path = require('path');
 const { mapToEnum } = require('../routes/process');
+const { createNotification } = require('../utils/notifications');
 
 /* 
   APPLICATION CONTROLLER (Updated for unified users + faculties schema)
@@ -112,6 +113,17 @@ async function submitApplication(req, res) {
       );
     }
 
+    // Notify Researcher
+    try {
+      await createNotification(
+        user_id,
+        application.application_id,
+        "Application submitted successfully. We will notify you of any updates."
+      );
+    } catch (e) {
+      console.error("Submission Notification Error:", e);
+    }
+
     res.status(201).json({ message: "Application submitted successfully", application, documents: docRows });
   } catch (err) {
     console.error("Error submitting application:", err);
@@ -122,7 +134,7 @@ async function submitApplication(req, res) {
 // ✅ 2. Get all applications (Admin, Committee, Faculty)
 async function getAllApplications(req, res) {
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT 
         a.application_id,
         a.title,
@@ -148,8 +160,23 @@ async function getAllApplications(req, res) {
       JOIN users u ON a.researcher_id = u.id
       JOIN faculties f ON a.faculty_id = f.id
       LEFT JOIN process p ON a.application_id = p.application_id
-      ORDER BY a.submission_date DESC;
-    `);
+    `;
+
+    const userRoles = req.user.roles || [];
+    const isSuperAdmin = userRoles.includes('super_admin');
+    const isAdmin = userRoles.includes('admin');
+    const isFacultyAdmin = userRoles.includes('faculty_admin');
+
+    const params = [];
+    if (!isSuperAdmin && !isAdmin && isFacultyAdmin) {
+      // Filter by faculty for faculty admins
+      query += ` WHERE a.faculty_id = $1`;
+      params.push(req.user.faculty_id);
+    }
+
+    query += ` ORDER BY a.submission_date DESC;`;
+
+    const result = await pool.query(query, params);
 
     const normalizeStep = (step) => {
       const map = {
@@ -339,6 +366,15 @@ async function modifyApplication(req, res) {
         ]);
       }
     }
+
+    // Notify Researcher
+    try {
+      await createNotification(
+        req.user.id,
+        id,
+        "Application plan updated and re-submitted."
+      );
+    } catch (e) { console.error('Modification notification failed', e); }
 
     return res.status(200).json({
       message: "Application updated successfully.",
